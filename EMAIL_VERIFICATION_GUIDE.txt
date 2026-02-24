@@ -1,0 +1,88 @@
+================================================================================
+EMAIL PROVIDER VERIFICATION GUIDE
+================================================================================
+
+HOW TO VERIFY YOUR EMAIL PROVIDER (PURELYMAIL/SMTP)
+================================================================================
+
+1. LOGIN TO THE PLATFORM
+   - Go to: http://127.0.0.1:5001/auth/login
+   - Email: test@example.com
+   - Password: password123
+
+2. GO TO PROVIDERS PAGE
+   - Click "Providers" in the navigation
+   - Or go to: http://127.0.0.1:5001/providers
+
+3. ADD YOUR PURELYMAIL PROVIDER
+   - Click "Add Provider" button
+   - Select "SMTP" from provider type dropdown
+   - Fill in the form:
+   
+     Provider Type: SMTP
+     Sender Email: your@purelymail.email
+     Sender Name: Your Name
+     
+     SMTP Settings:
+     - Host: smtp.purelymail.com
+     - Port: 587
+     - Username: your@purelymail.email (same as sender email)
+     - Password: your_purelymail_password
+   
+   - Click "Save"
+
+4. VERIFY THE PROVIDER
+   - After saving, you'll see your provider in the list
+   - Click the "Verify" button next to your provider
+   - The system will test the SMTP connection
+   - If successful, you'll see a green checkmark ✓
+   - Status will change to "Verified"
+
+5. TROUBLESHOOTING VERIFICATION FAILURES
+
+   Common issues:
+   
+   a) Wrong credentials
+      → Double-check your email and password
+      → Make sure you're using the correct Purelymail account
+   
+   b) SMTP not enabled
+      → Login to Purelymail dashboard
+      → Check if SMTP is enabled for your account
+   
+   c) Port blocked
+      → Port 587 must be open on your network
+      → Try from a different network if blocked
+   
+   d) App password required
+      → Some providers require app-specific passwords
+      → Check Purelymail settings for app passwords
+
+================================================================================
+WHAT VERIFICATION DOES
+================================================================================
+
+The verification process:
+1. Connects to smtp.purelymail.com:587
+2. Initiates STARTTLS encryption
+3. Authenticates with your username/password
+4. Confirms the connection is valid
+5. Updates provider status to "verified"
+
+Once verified, you can:
+- Send campaigns using this provider
+- The system trusts the credentials are valid
+- Rate limiting is enforced based on provider settings
+
+================================================================================
+AFTER VERIFICATION
+================================================================================
+
+Next steps:
+1. Create a recipient list (Lists page)
+2. Create an email template (Templates page)
+3. Launch a campaign (Campaign Wizard)
+
+Your provider is now ready to send emails!
+
+================================================================================

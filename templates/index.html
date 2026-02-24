@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BulkMailer - Free Bulk Email Service</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 16px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 40px 30px; 
+            text-align: center;
+            position: relative;
+        }
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: white;
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+        }
+        .logo { 
+            font-size: 36px; 
+            font-weight: 700; 
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        .logo-icon { 
+            display: inline-block;
+            font-size: 40px;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .tagline { 
+            opacity: 0.95; 
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .free-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 12px;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        .tabs { 
+            display: flex; 
+            background: #f8f9fa; 
+            padding: 0 20px;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+        .tab { 
+            flex: 1; 
+            padding: 20px; 
+            text-align: center; 
+            cursor: pointer; 
+            font-weight: 600; 
+            color: #6c757d; 
+            transition: all 0.3s; 
+            border-radius: 12px 12px 0 0;
+            position: relative;
+            top: 2px;
+        }
+        .tab:hover { 
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+        .tab.active { 
+            color: #667eea; 
+            background: white;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+        }
+        .tab-icon {
+            font-size: 24px;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .content { 
+            padding: 40px; 
+            background: white;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 24px; }
+        .form-group-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        label { 
+            display: block; 
+            margin-bottom: 10px; 
+            font-weight: 600; 
+            color: #2d3748; 
+            font-size: 14px;
+        }
+        .label-hint {
+            font-weight: 400;
+            color: #718096;
+            font-size: 13px;
+            margin-left: 4px;
+        }
+        input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea { 
+            width: 100%; 
+            padding: 14px 16px; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 10px; 
+            font-size: 15px; 
+            transition: all 0.3s;
+            font-family: inherit;
+            background: #f7fafc;
+        }
+        input:focus, textarea:focus { 
+            outline: none; 
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        textarea { resize: vertical; min-height: 120px; }
+        .btn { 
+            padding: 14px 28px; 
+            border: none; 
+            border-radius: 10px; 
+            font-size: 15px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .btn-primary:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary { 
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        .btn-secondary:hover { 
+            background: #667eea;
+            color: white;
+        }
+        .btn:disabled { 
+            opacity: 0.6; 
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .info-box { 
+            background: linear-gradient(135deg, #e7f3ff 0%, #f0f4ff 100%);
+            border-left: 4px solid #667eea; 
+            padding: 16px 20px; 
+            margin: 20px 0; 
+            border-radius: 10px; 
+            font-size: 14px; 
+            color: #2d3748;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+        }
+        .info-box strong {
+            color: #667eea;
+        }
+        .success-box {
+            background: linear-gradient(135deg, #d4edda 0%, #e8f5e9 100%);
+            border-left: 4px solid #28a745;
+        }
+        .warning-box {
+            background: linear-gradient(135deg, #fff3cd 0%, #fffbea 100%);
+            border-left: 4px solid #ffc107;
+        }
+        .log-area { 
+            background: #1a202c;
+            border: 2px solid #2d3748; 
+            border-radius: 12px; 
+            padding: 20px; 
+            height: 350px; 
+            overflow-y: auto; 
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace; 
+            font-size: 13px; 
+            margin-top: 24px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .log-entry { 
+            padding: 6px 0; 
+            line-height: 1.6;
+            font-size: 13px;
+        }
+        .log-success { color: #48bb78; }
+        .log-error { color: #f56565; }
+        .log-info { color: #90cdf4; }
+        .status-bar { 
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px 40px; 
+            border-top: 2px solid #e2e8f0; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        .status-text { 
+            color: #4a5568; 
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .footer-branding {
+            font-size: 12px;
+            color: #718096;
+        }
+        .footer-branding a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .footer-branding a:hover {
+            text-decoration: underline;
+        }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .checkbox-group { display: flex; align-items: center; margin-top: 10px; }
+        .checkbox-group input { width: auto; margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <span class="logo-icon">📧</span>BulkMailer
+            </div>
+            <p class="tagline">Send personalized bulk emails for free • No signup required</p>
+            <div class="free-badge">✨ 100% Free Forever</div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab(0)">
+                <span class="tab-icon">⚙️</span>
+                <div>Setup</div>
+            </div>
+            <div class="tab" onclick="switchTab(1)">
+                <span class="tab-icon">👥</span>
+                <div>Recipients</div>
+            </div>
+            <div class="tab" onclick="switchTab(2)">
+                <span class="tab-icon">✉️</span>
+                <div>Compose</div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Tab 1: Setup -->
+            <div class="tab-content active">
+                <h2 style="margin-bottom: 12px; color: #2d3748; font-size: 24px;">📮 Email Server Setup</h2>
+                <p style="color: #718096; margin-bottom: 32px; font-size: 15px;">Configure your SMTP server to send emails. We recommend using Brevo (free tier available).</p>
+                
+                <div class="form-group-inline">
+                    <div class="form-group">
+                        <label>SMTP Server <span class="label-hint">(e.g., smtp-relay.brevo.com)</span></label>
+                        <input type="text" id="smtp_server" value="smtp-relay.brevo.com" placeholder="smtp-relay.brevo.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Port <span class="label-hint">(usually 587)</span></label>
+                        <input type="number" id="smtp_port" value="587" placeholder="587">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>SMTP Login <span class="label-hint">(your SMTP username)</span></label>
+                    <input type="text" id="email_user" placeholder="your-smtp-login@smtp-brevo.com">
+                </div>
+
+                <div class="form-group">
+                    <label>SMTP Password <span class="label-hint">(your SMTP password or API key)</span></label>
+                    <input type="password" id="email_pass" placeholder="Enter your SMTP password">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="show_pass" onchange="togglePassword()">
+                        <label for="show_pass" style="margin: 0; font-weight: normal;">Show password</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>From Email Address <span class="label-hint">(sender email)</span></label>
+                    <input type="email" id="from_email" value="hello@morningbuddy.co.uk" placeholder="your-email@domain.com">
+                </div>
+
+                <div class="info-box">
+                    <strong>💡 Need an SMTP server?</strong><br>
+                    We recommend <a href="https://www.brevo.com" target="_blank" style="color: #667eea; font-weight: 600;">Brevo</a> (formerly Sendinblue) - they offer 300 free emails per day!<br>
+                    Other options: Gmail (with App Password), SendGrid, Mailgun, Amazon SES
+                </div>
+            </div>
+
+            <!-- Tab 2: Recipients -->
+            <div class="tab-content">
+                <h2 style="margin-bottom: 12px; color: #2d3748; font-size: 24px;">👥 Add Your Recipients</h2>
+                <p style="color: #718096; margin-bottom: 32px; font-size: 15px;">Upload a CSV file or paste email addresses manually. CSV columns become variables you can use!</p>
+                
+                <!-- CSV Upload Section -->
+                <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border: 2px dashed #cbd5e0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                    <h3 style="margin: 0 0 16px 0; color: #2d3748; font-size: 18px;">📊 Upload CSV File</h3>
+                    <input type="file" id="csv_file" accept=".csv" onchange="handleCSVUpload()" style="margin-bottom: 12px;">
+                    <div id="csv_fields" style="display: none; margin-top: 16px; padding: 16px; background: white; border-radius: 8px; border: 2px solid #667eea;">
+                        <strong style="color: #667eea;">✓ CSV Loaded - Available Fields:</strong>
+                        <div id="fields_list" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                        <p style="margin: 12px 0 0 0; font-size: 13px; color: #718096;">
+                            Use these fields in your email with [FieldName] syntax
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Manual Entry Section -->
+                <div class="form-group">
+                    <label>Or Enter Recipients Manually <span class="label-hint">(one per line)</span></label>
+                    <textarea id="recipients" rows="12" placeholder="Format options:&#10;&#10;email@example.com&#10;email@example.com, John Doe&#10;email@example.com, John Doe, Acme Corp&#10;&#10;Example:&#10;james@example.com, James Smith, Tech University&#10;sarah@company.com, Sarah Johnson, Design Co" style="font-family: 'SF Mono', Monaco, monospace; font-size: 14px;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+                    <button class="btn btn-secondary" onclick="validateRecipients()">🔍 Validate List</button>
+                    <button class="btn btn-secondary" onclick="clearRecipients()">🗑️ Clear All</button>
+                    <div id="recipient_count" style="font-weight: 600; color: #667eea;"></div>
+                </div>
+                
+                <div class="info-box">
+                    <strong>📋 CSV Format:</strong><br>
+                    Your CSV must have an "email" column. All other columns become variables!<br><br>
+                    <strong>Example CSV:</strong><br>
+                    <code style="background: rgba(102,126,234,0.1); padding: 8px; border-radius: 4px; display: block; margin-top: 8px; font-size: 12px;">
+                    email,name,company,position<br>
+                    john@example.com,John Doe,Acme Corp,CEO<br>
+                    sarah@test.com,Sarah Smith,Tech Inc,CTO
+                    </code><br>
+                    Then use: [name], [company], [position] in your email!
+                </div>
+            </div>
+
+            <!-- Tab 3: Compose -->
+            <div class="tab-content">
+                <h2 style="margin-bottom: 12px; color: #2d3748; font-size: 24px;">✉️ Compose Your Email</h2>
+                <p style="color: #718096; margin-bottom: 32px; font-size: 15px;">Write your message and personalize it with recipient data.</p>
+                
+                <div class="form-group">
+                    <label>Subject Line <span class="label-hint">(use [FieldName] for any CSV column)</span></label>
+                    <input type="text" id="subject" placeholder="e.g., Hello [name]! Special offer for [company]">
+                </div>
+
+                <div class="checkbox-group" style="margin-bottom: 24px; padding: 16px; background: #f7fafc; border-radius: 10px;">
+                    <input type="checkbox" id="send_as_html" onchange="toggleHtmlMode()">
+                    <label for="send_as_html" style="margin: 0; font-weight: 600; color: #2d3748;">📝 Send as HTML (for styled emails with images and formatting)</label>
+                </div>
+
+                <div class="form-group" id="text_body_group">
+                    <label>Message <span class="label-hint">(use [FieldName] for any CSV column)</span></label>
+                    <textarea id="body" rows="12" placeholder="Dear [name],&#10;&#10;I hope this email finds you well at [company].&#10;&#10;I wanted to reach out because...&#10;&#10;Best regards,&#10;Your Name"></textarea>
+                </div>
+
+                <div class="form-group" id="html_body_group" style="display: none;">
+                    <label>HTML Template <span class="label-hint">(use [FieldName] for any CSV column)</span></label>
+                    <textarea id="html_body" rows="16" placeholder="<html><body><h1>Hello [name]!</h1><p>Welcome to [company]</p></body></html>" style="font-family: 'SF Mono', Monaco, monospace; font-size: 13px;"></textarea>
+                    <button class="btn btn-secondary" onclick="loadHtmlTemplate()" style="margin-top: 12px;">📄 Load Sample Template</button>
+                    
+                    <div class="info-box" style="margin-top: 16px;">
+                        <strong>💡 Pro Tip:</strong> Plain text fallback is auto-generated from HTML if not provided. For better deliverability, add a custom plain text version above.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Delay Between Emails <span class="label-hint">(seconds - helps avoid spam filters)</span></label>
+                    <input type="number" id="delay" value="3" min="0" max="60" style="max-width: 200px;">
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+                    <button class="btn btn-primary" onclick="sendEmails(false)" id="sendBtn">
+                        <span>🚀</span> Send All Emails
+                    </button>
+                    <button class="btn btn-secondary" onclick="sendEmails(true)" id="testBtn">
+                        <span>🧪</span> Test Mode (Preview Only)
+                    </button>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <strong style="color: #2d3748; font-size: 15px;">📊 Sending Log</strong>
+                </div>
+                <div class="log-area" id="logArea">
+                    <div style="color: #90cdf4; text-align: center; padding: 40px;">
+                        Ready to send emails. Click "Send All Emails" to begin.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-text" id="statusText">Ready to send</div>
+            <div class="footer-branding">
+                Powered by <a href="https://morningbuddy.co.uk" target="_blank">Morning Buddy</a> • Free bulk email service
+            </div>
+            <div id="statusBadge"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 0;
+        let csvRecipients = [];
+        let csvFields = [];
+
+        function switchTab(index) {
+            const tabs = document.querySelectorAll('.tab');
+            const contents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            
+            contents.forEach((content, i) => {
+                content.classList.toggle('active', i === index);
+            });
+            
+            currentTab = index;
+        }
+
+        function togglePassword() {
+            const passInput = document.getElementById('email_pass');
+            passInput.type = document.getElementById('show_pass').checked ? 'text' : 'password';
+        }
+
+        function toggleHtmlMode() {
+            const isHtml = document.getElementById('send_as_html').checked;
+            const textGroup = document.getElementById('text_body_group');
+            const htmlGroup = document.getElementById('html_body_group');
+            
+            if (isHtml) {
+                textGroup.style.display = 'block';
+                htmlGroup.style.display = 'block';
+                textGroup.querySelector('label').textContent = 'Plain Text Fallback (optional - auto-generated if empty)';
+            } else {
+                textGroup.style.display = 'block';
+                htmlGroup.style.display = 'none';
+                textGroup.querySelector('label').innerHTML = 'Message <span class="label-hint">(use [FieldName] for CSV fields)</span>';
+            }
+        }
+
+        async function handleCSVUpload() {
+            const fileInput = document.getElementById('csv_file');
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const csvContent = e.target.result;
+                
+                try {
+                    const response = await fetch('/parse_csv', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ csv_content: csvContent })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        csvRecipients = data.recipients;
+                        csvFields = data.fields;
+                        
+                        // Show fields
+                        const fieldsDiv = document.getElementById('csv_fields');
+                        const fieldsList = document.getElementById('fields_list');
+                        fieldsDiv.style.display = 'block';
+                        
+                        fieldsList.innerHTML = data.fields.map(field => 
+                            `<span style="background: #667eea; color: white; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">[${field}]</span>`
+                        ).join('');
+                        
+                        // Clear manual entry
+                        document.getElementById('recipients').value = '';
+                        
+                        document.getElementById('recipient_count').textContent = `✓ Loaded ${data.count} recipients from CSV`;
+                        log(`CSV loaded: ${data.count} recipients, ${data.fields.length} fields`, 'success');
+                    } else {
+                        alert('Error parsing CSV: ' + data.error);
+                        if (data.fields && data.fields.length > 0) {
+                            alert('Available fields: ' + data.fields.join(', ') + '\\n\\nMake sure you have an "email" column!');
+                        }
+                    }
+                } catch (error) {
+                    alert('Error uploading CSV: ' + error);
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function clearRecipients() {
+            document.getElementById('recipients').value = '';
+            document.getElementById('csv_file').value = '';
+            document.getElementById('csv_fields').style.display = 'none';
+            document.getElementById('recipient_count').textContent = '';
+            csvRecipients = [];
+            csvFields = [];
+            log('Recipients cleared', 'info');
+        }
+
+        async function loadHtmlTemplate() {
+            try {
+                const response = await fetch('/load_template');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('html_body').value = data.content;
+                    
+                    // Show metadata
+                    const metadata = data.metadata;
+                    const metadataHtml = `
+                        <div style="background: #e7f3ff; border-left: 4px solid #2196F3; padding: 10px; margin: 10px 0; font-size: 12px;">
+                            <strong>✓ Template Loaded</strong><br>
+                            Path: ${metadata.path}<br>
+                            Length: ${metadata.length} chars<br>
+                            Hash: ${metadata.hash}<br>
+                            Preview: ${metadata.preview}...
+                        </div>
+                    `;
+                    
+                    // Insert metadata after the textarea
+                    const existingMetadata = document.getElementById('template_metadata');
+                    if (existingMetadata) {
+                        existingMetadata.remove();
+                    }
+                    
+                    const metadataDiv = document.createElement('div');
+                    metadataDiv.id = 'template_metadata';
+                    metadataDiv.innerHTML = metadataHtml;
+                    document.getElementById('html_body').parentNode.appendChild(metadataDiv);
+                    
+                    log(`Loaded template: ${metadata.length} chars, hash: ${metadata.hash}`, 'success');
+                } else {
+                    alert('Could not load template: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error loading template: ' + error);
+            }
+        }
+
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('logArea');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function setStatus(text, badge = '') {
+            document.getElementById('statusText').textContent = text;
+            document.getElementById('statusBadge').innerHTML = badge;
+        }
+
+        async function validateRecipients() {
+            const recipients = document.getElementById('recipients').value;
+            
+            try {
+                const response = await fetch('/validate_recipients', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipients })
+                });
+                
+                const data = await response.json();
+                
+                // Update textarea with cleaned list
+                const cleaned = data.recipients.map(r => `${r.email}, ${r.name}, ${r.university}`).join('\n');
+                document.getElementById('recipients').value = cleaned;
+                document.getElementById('recipient_count').textContent = `✓ Found ${data.count} valid recipients`;
+                setStatus(`List validated: ${data.count} recipients`, `<span class="badge badge-success">${data.count} recipients</span>`);
+            } catch (error) {
+                alert('Error validating recipients: ' + error);
+            }
+        }
+
+        async function sendEmails(dryRun = false) {
+            const sendBtn = document.getElementById('sendBtn');
+            const testBtn = document.getElementById('testBtn');
+            const logArea = document.getElementById('logArea');
+            
+            // Get all values
+            const smtp_server = document.getElementById('smtp_server').value;
+            const smtp_port = document.getElementById('smtp_port').value;
+            const email_user = document.getElementById('email_user').value;
+            const email_pass = document.getElementById('email_pass').value;
+            const from_email = document.getElementById('from_email').value;
+            const subject = document.getElementById('subject').value;
+            const send_as_html = document.getElementById('send_as_html').checked;
+            const body = document.getElementById('body').value;
+            const html_body = document.getElementById('html_body').value;
+            const delay = document.getElementById('delay').value;
+            const recipients = document.getElementById('recipients').value;
+            
+            // Validation
+            if (!email_user || !email_pass) {
+                alert('Please configure your SMTP credentials in Setup tab');
+                switchTab(0);
+                return;
+            }
+            
+            // Check if we have CSV recipients or manual entry
+            const hasCSV = csvRecipients.length > 0;
+            const hasManual = recipients.trim().length > 0;
+            
+            if (!hasCSV && !hasManual) {
+                alert('Please add recipients (upload CSV or enter manually)');
+                switchTab(1);
+                return;
+            }
+            
+            if (!subject || (!body && !send_as_html) || (send_as_html && !html_body)) {
+                alert('Please enter subject and message body');
+                return;
+            }
+            
+            const recipientCount = hasCSV ? csvRecipients.length : recipients.split('\n').filter(l => l.trim()).length;
+            if (!dryRun && !confirm(`Send email to ${recipientCount} recipients?`)) {
+                return;
+            }
+            
+            // Clear log and disable buttons
+            logArea.innerHTML = '';
+            sendBtn.disabled = true;
+            testBtn.disabled = true;
+            const activeBtn = dryRun ? testBtn : sendBtn;
+            activeBtn.innerHTML = '<span class="spinner"></span>' + (dryRun ? 'Testing...' : 'Sending...');
+            log(dryRun ? 'Starting test mode (no emails will be sent)...' : 'Starting batch process...', 'info');
+            
+            if (hasCSV && csvFields.length > 0) {
+                log(`Using CSV data with fields: ${csvFields.join(', ')}`, 'info');
+            }
+            
+            setStatus(dryRun ? 'Testing...' : 'Sending emails...', '<span class="spinner"></span>');
+            
+            try {
+                const payload = {
+                    smtp_server, smtp_port, email_user, email_pass, from_email,
+                    subject, body, html_body, send_as_html, delay,
+                    dry_run: dryRun
+                };
+                
+                // Use CSV recipients if available, otherwise use manual entry
+                if (hasCSV) {
+                    payload.recipients_list = csvRecipients;
+                } else {
+                    payload.recipients = recipients;
+                }
+                
+                const response = await fetch('/send_emails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (!dryRun) {
+                        log(`Connected to ${smtp_server}`, 'success');
+                    }
+                    
+                    // Log template metadata if present
+                    if (data.template_metadata) {
+                        log(`Template: ${data.template_metadata.length} chars, hash: ${data.template_metadata.hash}`, 'info');
+                    }
+                    
+                    data.results.forEach((result, index) => {
+                        if (result.status === 'success') {
+                            log(`[${index + 1}/${data.total}] ✓ Sent to ${result.email} (${result.name})`, 'success');
+                        } else if (result.status === 'dry-run') {
+                            log(`[${index + 1}/${data.total}] 🧪 Preview: ${result.email} (${result.name})`, 'info');
+                            log(`  Subject: ${result.rendered_subject}`, 'info');
+                            if (result.rendered_html_preview) {
+                                log(`  HTML preview: ${result.rendered_html_preview}...`, 'info');
+                            }
+                        } else {
+                            log(`[${index + 1}/${data.total}] ✗ Failed: ${result.email} - ${result.message}`, 'error');
+                        }
+                    });
+                    
+                    if (dryRun) {
+                        log(`Test complete: ${data.sent}/${data.total} previewed`, 'success');
+                        setStatus('Test Complete', `<span class="badge badge-success">${data.sent} previewed</span>`);
+                    } else {
+                        log(`Batch complete: ${data.sent}/${data.total} sent successfully`, 'success');
+                        setStatus('Complete', `<span class="badge badge-success">${data.sent}/${data.total} sent</span>`);
+                    }
+                } else {
+                    log(`Error: ${data.error}`, 'error');
+                    setStatus('Error', '');
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                log(`Critical error: ${error}`, 'error');
+                alert('Error: ' + error);
+            } finally {
+                sendBtn.disabled = false;
+                testBtn.disabled = false;
+                sendBtn.innerHTML = '<span>🚀</span> Send All Emails';
+                testBtn.innerHTML = '<span>🧪</span> Test Mode (Preview Only)';
+            }
+        }
+    </script>
+</body>
+</html>

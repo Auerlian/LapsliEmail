@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<h1>Settings</h1>
+
+<div class="card">
+    <h2>Account</h2>
+    <p>Email: {{ current_user.email }}</p>
+    <p>Send Limit: {{ current_user.send_limit }} per day</p>
+</div>
+
+<div class="card">
+    <h2>Suppression List</h2>
+    <p>Manage unsubscribed emails</p>
+</div>
+{% endblock %}

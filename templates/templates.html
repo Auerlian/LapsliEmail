@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Templates{% endblock %}
+
+{% block content %}
+<h1>Email Templates</h1>
+
+<div class="card">
+    <h2>Template Editor</h2>
+    <div class="form-group">
+        <label>Subject</label>
+        <input type="text" id="subject" placeholder="Use {{variable}} for personalization">
+    </div>
+    <div class="form-group">
+        <label>HTML Body</label>
+        <textarea id="html-body" rows="15"></textarea>
+    </div>
+    <div class="form-group">
+        <label>Variables Found</label>
+        <div id="variables"></div>
+    </div>
+    <button class="btn btn-primary" onclick="previewTemplate()">Preview</button>
+</div>
+
+<div class="card">
+    <h2>AI Assistant</h2>
+    <div class="form-group">
+        <label>Provider</label>
+        <select id="ai-provider">
+            <option value="openai">OpenAI</option>
+            <option value="claude">Claude</option>
+            <option value="gemini">Gemini</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Prompt</label>
+        <textarea id="ai-prompt" rows="3" placeholder="Generate a professional email for..."></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="generateWithAI()">Generate</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function previewTemplate() {
+    const template = document.getElementById('html-body').value;
+    const result = await API.post('/templates/validate', {template});
+    document.getElementById('variables').innerHTML = result.found.join(', ');
+}
+
+async function generateWithAI() {
+    const provider = document.getElementById('ai-provider').value;
+    const prompt = document.getElementById('ai-prompt').value;
+    const result = await API.post('/templates/ai/generate', {provider, prompt, variables: []});
+    
+    if (result.success) {
+        document.getElementById('html-body').value = result.content;
+        showMessage('Generated successfully');
+    } else {
+        showMessage(result.error, 'error');
+    }
+}
+</script>
+{% endblock %}

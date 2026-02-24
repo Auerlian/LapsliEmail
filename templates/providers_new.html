@@ -1,0 +1,237 @@
+{% extends "base_app.html" %}
+
+{% block page_title %}Providers{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Email Providers</h3>
+        <button class="btn btn-primary" onclick="showAddProvider()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Provider
+        </button>
+    </div>
+    
+    <div class="alert alert-info">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; vertical-align: middle; margin-right: 8px;">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        All credentials are encrypted at rest using Fernet encryption
+    </div>
+    
+    <div id="provider-grid" class="grid grid-3">
+        {% for provider in providers %}
+        <div class="provider-card">
+            <div class="provider-header">
+                <div class="provider-type">{{ provider.provider_type }}</div>
+                <div class="provider-actions">
+                    <button class="btn-icon" onclick="verifyProvider({{ provider.id }})">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </button>
+                    <button class="btn-icon" onclick="deleteProvider({{ provider.id }})">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="provider-email">{{ provider.sender_email }}</div>
+            
+            <div class="provider-meta">
+                <div class="provider-status">
+                    {% if provider.is_verified %}
+                    <span class="badge badge-success">Verified</span>
+                    {% else %}
+                    <span class="badge badge-warning">Unverified</span>
+                    {% endif %}
+                    
+                    {% if provider.health_status == 'healthy' %}
+                    <span class="badge badge-success">Healthy</span>
+                    {% elif provider.health_status == 'error' %}
+                    <span class="badge badge-error">Error</span>
+                    {% else %}
+                    <span class="badge badge-neutral">Unknown</span>
+                    {% endif %}
+                </div>
+                
+                <div class="provider-limit">Rate: {{ provider.rate_limit }}/min</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if not providers %}
+    <div class="empty-state">
+        <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+        </svg>
+        <div class="empty-state-title">No providers connected</div>
+        <div class="empty-state-text">Connect your first email provider to start sending campaigns</div>
+        <button class="btn btn-primary" onclick="showAddProvider()">Add Provider</button>
+    </div>
+    {% endif %}
+</div>
+
+<div id="add-provider-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add Email Provider</h3>
+            <button class="btn-icon" onclick="closeModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Provider Type</label>
+                <select id="provider-type" class="form-input" onchange="updateProviderForm()">
+                    <option value="">Select provider</option>
+                    <option value="gmail">Gmail (OAuth)</option>
+                    <option value="sendgrid">SendGrid</option>
+                    <option value="mailgun">Mailgun</option>
+                    <option value="ses">AWS SES</option>
+                    <option value="brevo">Brevo</option>
+                    <option value="smtp">SMTP</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Sender Email</label>
+                <input type="email" id="sender-email" class="form-input" placeholder="sender@example.com">
+            </div>
+            
+            <div id="dynamic-fields"></div>
+        </div>
+        
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveProvider()">Add Provider</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.provider-card {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.provider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.provider-type {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-900);
+    text-transform: capitalize;
+}
+
+.provider-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-icon {
+    padding: 6px;
+    background: none;
+    border: none;
+    color: var(--gray-500);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.btn-icon:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+.provider-email {
+    font-size: 13px;
+    color: var(--gray-600);
+    margin-bottom: 16px;
+}
+
+.provider-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.provider-status {
+    display: flex;
+    gap: 6px;
+}
+
+.provider-limit {
+    font-size: 12px;
+    color: var(--gray-500);
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--white);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--gray-200);
+}
+</style>
+
+<script src="/static/js/providers.js"></script>
+{% endblock %}

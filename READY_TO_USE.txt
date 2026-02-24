@@ -1,0 +1,98 @@
+================================================================================
+LAPSLIE EMAIL PLATFORM - READY TO USE WITH PURELYMAIL
+================================================================================
+
+✅ SERVER RUNNING: http://127.0.0.1:5001
+
+✅ DATABASE MIGRATED: All tables created, users preserved
+
+✅ PURELYMAIL SUPPORT: Full SMTP integration ready
+
+================================================================================
+QUICK START
+================================================================================
+
+1. LOGIN
+   URL: http://127.0.0.1:5001/auth/login
+   Email: test@example.com
+   Password: password123
+
+2. ADD PURELYMAIL PROVIDER
+   - Go to Providers page
+   - Click "Add Provider" → Select "SMTP"
+   - Enter:
+     * Host: smtp.purelymail.com
+     * Port: 587
+     * Username: your@purelymail.email
+     * Password: your_password
+   - Click "Verify"
+
+3. CREATE RECIPIENT LIST
+   - Go to Lists page
+   - Upload CSV with: email,name,custom_fields
+   - System validates and deduplicates
+
+4. SEND CAMPAIGN
+   - Go to Campaign Wizard
+   - Select provider, list, write HTML template
+   - Use {{variables}} for personalization
+   - Click "Create & Send"
+
+================================================================================
+PURELYMAIL SMTP SETTINGS
+================================================================================
+
+Host: smtp.purelymail.com
+Port: 587
+Security: STARTTLS (automatic)
+Auth: Username/Password
+Rate Limit: 100/hour (configurable)
+
+================================================================================
+TEST SCRIPTS
+================================================================================
+
+Check system status:
+  python test_email_flow.py
+
+Test Purelymail connection:
+  python test_purelymail.py
+
+================================================================================
+FEATURES WORKING
+================================================================================
+
+✓ Multi-provider support (SMTP, SendGrid, Mailgun, SES, Brevo)
+✓ CSV import with validation and deduplication
+✓ HTML template editor with variable substitution
+✓ Campaign wizard with spam checking
+✓ Rate limiting and send caps
+✓ Suppression list enforcement
+✓ Campaign monitoring and logs
+✓ Encrypted credential storage
+✓ Daily send limits per user
+
+================================================================================
+HTML TEMPLATE VARIABLES
+================================================================================
+
+Use {{variable}} syntax in subject and body:
+  {{email}} - recipient email
+  {{name}} - recipient name
+  {{any_csv_column}} - any column from your CSV
+
+Example:
+  Subject: Hello {{name}}!
+  Body: <h1>Hi {{name}}</h1><p>Sent to {{email}}</p>
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Open http://127.0.0.1:5001
+2. Login with test@example.com / password123
+3. Add your Purelymail SMTP credentials
+4. Upload a recipient list CSV
+5. Create and send your first campaign!
+
+================================================================================

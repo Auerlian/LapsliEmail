@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1 style="font-size: 32px; font-weight: 600; margin-bottom: 24px;">Dashboard</h1>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 36px; font-weight: 700; color: var(--primary);" id="stat-campaigns">0</div>
+        <div style="color: var(--text-secondary); margin-top: 8px;">Campaigns</div>
+    </div>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 36px; font-weight: 700; color: var(--primary);" id="stat-lists">0</div>
+        <div style="color: var(--text-secondary); margin-top: 8px;">Recipient Lists</div>
+    </div>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 36px; font-weight: 700; color: var(--primary);" id="stat-providers">0</div>
+        <div style="color: var(--text-secondary); margin-top: 8px;">Providers</div>
+    </div>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 36px; font-weight: 700; color: var(--success);" id="stat-sent">0</div>
+        <div style="color: var(--text-secondary); margin-top: 8px;">Emails Sent</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Quick Actions</h2>
+    <div style="display: flex; gap: 12px; margin-top: 16px;">
+        <a href="/providers/" class="btn btn-primary">Add Provider</a>
+        <a href="/lists/" class="btn btn-secondary">Upload Recipients</a>
+        <a href="/campaigns/" class="btn btn-secondary">Create Campaign</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadStats() {
+    try {
+        const stats = await API.get('/dashboard/stats');
+        document.getElementById('stat-campaigns').textContent = stats.campaigns;
+        document.getElementById('stat-lists').textContent = stats.lists;
+        document.getElementById('stat-providers').textContent = stats.providers;
+        document.getElementById('stat-sent').textContent = stats.total_sent;
+    } catch (e) {
+        console.error('Failed to load stats:', e);
+    }
+}
+
+loadStats();
+</script>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base_app.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="grid grid-4">
+    <div class="stat-card">
+        <div class="stat-label">Active Providers</div>
+        <div class="stat-value">{{ provider_count }}</div>
+        <div class="stat-meta">{{ verified_count }} verified</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Daily Send Limit</div>
+        <div class="stat-value">{{ remaining_sends }}</div>
+        <div class="stat-meta">of {{ send_limit }} remaining</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Recipient Lists</div>
+        <div class="stat-value">{{ list_count }}</div>
+        <div class="stat-meta">{{ total_recipients }} total recipients</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Campaigns</div>
+        <div class="stat-value">{{ campaign_count }}</div>
+        <div class="stat-meta">{{ active_campaigns }} active</div>
+    </div>
+</div>
+
+{% if alerts %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Alerts</h3>
+    </div>
+    {% for alert in alerts %}
+    <div class="alert alert-{{ alert.type }}">
+        {{ alert.message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Provider Status</h3>
+            <a href="/providers" class="btn-text">View All</a>
+        </div>
+        
+        {% if providers %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Provider</th>
+                    <th>Sender</th>
+                    <th>Status</th>
+                    <th>Health</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for provider in providers %}
+                <tr>
+                    <td>{{ provider.provider_type }}</td>
+                    <td>{{ provider.sender_email }}</td>
+                    <td>
+                        {% if provider.is_verified %}
+                        <span class="badge badge-success">Verified</span>
+                        {% else %}
+                        <span class="badge badge-warning">Unverified</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if provider.health_status == 'healthy' %}
+                        <span class="badge badge-success">Healthy</span>
+                        {% elif provider.health_status == 'error' %}
+                        <span class="badge badge-error">Error</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Unknown</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+            <div class="empty-state-title">No providers connected</div>
+            <div class="empty-state-text">Connect your first email provider to start sending campaigns</div>
+            <a href="/providers" class="btn btn-primary">Connect Provider</a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Campaigns</h3>
+            <a href="/campaigns" class="btn-text">View All</a>
+        </div>
+        
+        {% if campaigns %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Campaign</th>
+                    <th>Status</th>
+                    <th>Sent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for campaign in campaigns %}
+                <tr>
+                    <td>{{ campaign.name }}</td>
+                    <td>
+                        {% if campaign.status == 'completed' %}
+                        <span class="badge badge-success">Completed</span>
+                        {% elif campaign.status == 'sending' %}
+                        <span class="badge badge-warning">Sending</span>
+                        {% elif campaign.status == 'failed' %}
+                        <span class="badge badge-error">Failed</span>
+                        {% else %}
+                        <span class="badge badge-neutral">{{ campaign.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ campaign.sent_count }} / {{ campaign.total_recipients }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            <div class="empty-state-title">No campaigns yet</div>
+            <div class="empty-state-text">Create your first campaign to start sending emails</div>
+            <a href="/campaigns/wizard" class="btn btn-primary">Create Campaign</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

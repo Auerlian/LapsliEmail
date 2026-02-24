@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Email Platform{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <nav class="nav">
+        <div class="nav-content">
+            <div class="nav-brand">📧 Bulk Email Platform</div>
+            <div class="nav-links">
+                <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
+                <a href="{{ url_for('providers.index') }}">Providers</a>
+                <a href="{{ url_for('lists.index') }}">Lists</a>
+                <a href="{{ url_for('templates.index') }}">Templates</a>
+                <a href="{{ url_for('campaigns.index') }}">Campaigns</a>
+            </div>
+            <div class="nav-user">
+                <span>{{ current_user.email }}</span>
+                <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+    
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

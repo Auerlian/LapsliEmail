@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Recipient Lists{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h1 style="font-size: 32px; font-weight: 600;">Recipient Lists</h1>
+    <button class="btn btn-primary" onclick="showUpload()">Upload CSV</button>
+</div>
+
+<div class="card">
+    <table class="table" id="lists-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Recipients</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 48px;">
+                    No lists yet. Upload a CSV file to get started.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div id="upload-modal" style="display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+        <h2>Upload CSV</h2>
+        <div class="form-group">
+            <label>List Name</label>
+            <input type="text" id="list-name" placeholder="My Recipients" required>
+        </div>
+        <div class="form-group">
+            <label>CSV Content</label>
+            <textarea id="csv-content" rows="10" placeholder="email,name,company&#10;john@example.com,John Doe,Acme Inc"></textarea>
+            <small>First row should contain column headers. Must include an 'email' column.</small>
+        </div>
+        <div id="csv-preview"></div>
+        <div style="display: flex; gap: 12px; margin-top: 16px;">
+            <button class="btn btn-primary" onclick="parseCSV()">Parse CSV</button>
+            <button class="btn btn-secondary" onclick="hideUpload()">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadLists() {
+    try {
+        const lists = await API.get('/lists/list');
+        const tbody = document.querySelector('#lists-table tbody');
+        
+        if (lists.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 48px;">
+                        No lists yet. Upload a CSV file to get started.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = lists.map(l => `
+            <tr>
+                <td style="font-weight: 600;">${l.name}</td>
+                <td>${l.recipient_count}</td>
+                <td>${formatDate(l.created_at)}</td>
+                <td><button class="btn btn-danger" onclick="deleteList(${l.id})">Delete</button></td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load lists:', e);
+    }
+}
+
+function showUpload() {
+    document.getElementById('upload-modal').style.display = 'flex';
+}
+
+function hideUpload() {
+    document.getElementById('upload-modal').style.display = 'none';
+    document.getElementById('list-name').value = '';
+    document.getElementById('csv-content').value = '';
+    document.getElementById('csv-preview').innerHTML = '';
+}
+
+async function parseCSV() {
+    const content = document.getElementById('csv-content').value;
+    if (!content.trim()) {
+        alert('Please paste CSV content');
+        return;
+    }
+    
+    const result = await API.post('/lists/parse', {content});
+    
+    if (result.error) {
+        alert('Error: ' + result.error);
+        return;
+    }
+    
+    document.getElementById('csv-preview').innerHTML = `
+        <div style="margin: 16px 0; padding: 16px; background: var(--bg-secondary); border-radius: 2px;">
+            <strong>Found ${result.count} valid recipients</strong>
+            <div style="margin-top: 8px; font-size: 14px; color: var(--text-secondary);">
+                Email field: ${result.email_field}<br>
+                Other fields: ${result.headers.filter(h => h !== result.email_field).join(', ')}
+            </div>
+        </div>
+        <button class="btn btn-success" onclick='createList(${JSON.stringify(result.rows)})'>Create List</button>
+    `;
+}
+
+async function createList(rows) {
+    const name = document.getElementById('list-name').value;
+    if (!name.trim()) {
+        alert('Please enter a list name');
+        return;
+    }
+    
+    await API.post('/lists/create', {name, rows});
+    hideUpload();
+    loadLists();
+}
+
+async function deleteList(id) {
+    if (confirm('Delete this list?')) {
+        await API.delete(`/lists/${id}`);
+        loadLists();
+    }
+}
+
+loadLists();
+</script>
+{% endblock %}

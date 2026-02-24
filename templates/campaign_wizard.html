@@ -1,0 +1,212 @@
+{% extends "base_app.html" %}
+
+{% block page_title %}Create Campaign{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+    <div class="wizard-steps">
+        <div class="wizard-step active" data-step="1">
+            <div class="step-number">1</div>
+            <div class="step-label">Provider</div>
+        </div>
+        <div class="wizard-step" data-step="2">
+            <div class="step-number">2</div>
+            <div class="step-label">List</div>
+        </div>
+        <div class="wizard-step" data-step="3">
+            <div class="step-number">3</div>
+            <div class="step-label">Template</div>
+        </div>
+        <div class="wizard-step" data-step="4">
+            <div class="step-number">4</div>
+            <div class="step-label">Review</div>
+        </div>
+        <div class="wizard-step" data-step="5">
+            <div class="step-number">5</div>
+            <div class="step-label">Send</div>
+        </div>
+    </div>
+
+    <div class="wizard-content">
+        <div class="wizard-panel" id="step-1">
+            <h2 class="wizard-title">Select Provider</h2>
+            <div id="provider-list" class="selection-grid"></div>
+        </div>
+
+        <div class="wizard-panel" id="step-2" style="display: none;">
+            <h2 class="wizard-title">Select Recipient List</h2>
+            <div id="list-selection" class="selection-grid"></div>
+        </div>
+
+        <div class="wizard-panel" id="step-3" style="display: none;">
+            <h2 class="wizard-title">Select Template</h2>
+            <div id="template-selection" class="selection-grid"></div>
+        </div>
+
+        <div class="wizard-panel" id="step-4" style="display: none;">
+            <h2 class="wizard-title">Review Campaign</h2>
+            <div id="campaign-review"></div>
+            <div id="validation-results"></div>
+        </div>
+
+        <div class="wizard-panel" id="step-5" style="display: none;">
+            <h2 class="wizard-title">Send Campaign</h2>
+            <div class="form-group">
+                <label class="form-label">Campaign Name</label>
+                <input type="text" id="campaign-name" class="form-input" placeholder="My Campaign">
+            </div>
+            <div id="send-progress"></div>
+        </div>
+    </div>
+
+    <div class="wizard-footer">
+        <button id="prev-btn" class="btn btn-secondary" style="display: none;">Previous</button>
+        <button id="next-btn" class="btn btn-primary">Next</button>
+    </div>
+</div>
+
+<style>
+.wizard-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    position: relative;
+}
+
+.wizard-steps::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 40px;
+    right: 40px;
+    height: 2px;
+    background: var(--gray-200);
+    z-index: 0;
+}
+
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 1;
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--gray-300);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--gray-500);
+    transition: all 0.2s;
+}
+
+.wizard-step.active .step-number {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: var(--white);
+}
+
+.wizard-step.completed .step-number {
+    background: var(--green);
+    border-color: var(--green);
+    color: var(--white);
+}
+
+.step-label {
+    font-size: 13px;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.wizard-step.active .step-label {
+    color: var(--gray-900);
+}
+
+.wizard-content {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 32px;
+    min-height: 400px;
+    margin-bottom: 24px;
+}
+
+.wizard-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 24px;
+}
+
+.wizard-footer {
+    display: flex;
+    justify-content: space-between;
+}
+
+.selection-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.selection-card {
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.selection-card:hover {
+    border-color: var(--blue);
+}
+
+.selection-card.selected {
+    border-color: var(--blue);
+    background: #EFF6FF;
+}
+
+.selection-card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.selection-card-meta {
+    font-size: 13px;
+    color: var(--gray-600);
+}
+
+.review-section {
+    background: var(--gray-50);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.review-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 8px;
+}
+
+.review-section p {
+    font-size: 14px;
+    color: var(--gray-900);
+}
+</style>
+
+<script src="/static/js/campaign_wizard.js"></script>
+{% endblock %}

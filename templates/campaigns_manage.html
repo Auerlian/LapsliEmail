@@ -1,0 +1,460 @@
+{% extends "base_app.html" %}
+
+{% block page_title %}Campaigns{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="font-size: 24px; font-weight: 600;">Email Campaigns</h2>
+        <a href="/campaigns/send" class="btn btn-primary">Send New Campaign</a>
+    </div>
+    
+    <div id="campaigns-list">
+        <div style="text-align: center; padding: 64px 32px; color: #9CA3AF;">
+            Loading campaigns...
+        </div>
+    </div>
+</div>
+
+<!-- Campaign Details Modal -->
+<div id="details-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-header">
+            <h3 id="campaign-name">Campaign Details</h3>
+            <button class="btn-icon" onclick="closeModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div id="campaign-details"></div>
+            
+            <div style="margin-top: 32px;">
+                <h4 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Delivery Logs</h4>
+                <div id="campaign-logs"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.campaign-card {
+    background: white;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.campaign-card:hover {
+    border-color: #2563EB;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.campaign-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 16px;
+}
+
+.campaign-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 4px;
+}
+
+.campaign-subject {
+    font-size: 14px;
+    color: #6B7280;
+}
+
+.campaign-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.stat-box {
+    text-align: center;
+    padding: 12px;
+    background: #F9FAFB;
+    border-radius: 6px;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #6B7280;
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-completed {
+    background: #DCFCE7;
+    color: #166534;
+}
+
+.status-sending {
+    background: #DBEAFE;
+    color: #1E40AF;
+}
+
+.status-failed {
+    background: #FEE2E2;
+    color: #991B1B;
+}
+
+.status-draft {
+    background: #F3F4F6;
+    color: #4B5563;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #F3F4F6;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #2563EB;
+    transition: width 0.3s;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.btn-icon {
+    padding: 6px;
+    background: none;
+    border: none;
+    color: #6B7280;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.btn-icon:hover {
+    background: #F3F4F6;
+    color: #111827;
+}
+
+.detail-row {
+    display: flex;
+    padding: 12px 0;
+    border-bottom: 1px solid #F3F4F6;
+}
+
+.detail-label {
+    width: 150px;
+    font-weight: 600;
+    color: #6B7280;
+    font-size: 14px;
+}
+
+.detail-value {
+    flex: 1;
+    color: #111827;
+    font-size: 14px;
+}
+
+.log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.log-table th {
+    text-align: left;
+    padding: 8px;
+    background: #F9FAFB;
+    font-weight: 600;
+    color: #6B7280;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.log-table td {
+    padding: 8px;
+    border-bottom: 1px solid #F3F4F6;
+}
+
+.log-status-sent {
+    color: #059669;
+    font-weight: 600;
+}
+
+.log-status-failed {
+    color: #DC2626;
+    font-weight: 600;
+}
+</style>
+
+<script>
+{% raw %}
+let campaigns = [];
+
+async function loadCampaigns() {
+    try {
+        const response = await fetch('/campaigns/list');
+        campaigns = await response.json();
+        renderCampaigns();
+    } catch (e) {
+        document.getElementById('campaigns-list').innerHTML = `
+            <div style="text-align: center; padding: 64px 32px;">
+                <p style="color: #DC2626;">Error loading campaigns: ${e.message}</p>
+            </div>
+        `;
+    }
+}
+
+function renderCampaigns() {
+    const container = document.getElementById('campaigns-list');
+    
+    if (campaigns.length === 0) {
+        container.innerHTML = `
+            <div class="card" style="text-align: center; padding: 64px 32px;">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto 16px; color: #D1D5DB;">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">No campaigns yet</h3>
+                <p style="color: #6B7280; margin-bottom: 24px;">Send your first email campaign to get started</p>
+                <a href="/campaigns/send" class="btn btn-primary">Send Campaign</a>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = campaigns.map(c => {
+        const total = c.total_recipients || 0;
+        const sent = c.sent_count || 0;
+        const failed = c.failed_count || 0;
+        const pending = total - sent - failed;
+        const successRate = total > 0 ? Math.round((sent / total) * 100) : 0;
+        
+        let statusClass = 'status-draft';
+        let statusText = c.status;
+        
+        if (c.status === 'completed') {
+            statusClass = 'status-completed';
+            statusText = 'Completed';
+        } else if (c.status === 'sending') {
+            statusClass = 'status-sending';
+            statusText = 'Sending';
+        } else if (c.status === 'failed') {
+            statusClass = 'status-failed';
+            statusText = 'Failed';
+        }
+        
+        return `
+            <div class="campaign-card" onclick="showDetails(${c.id})">
+                <div class="campaign-header">
+                    <div>
+                        <div class="campaign-title">${c.name}</div>
+                        <div class="campaign-subject">Subject: ${c.subject || 'No subject'}</div>
+                    </div>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                </div>
+                
+                <div class="campaign-stats">
+                    <div class="stat-box">
+                        <div class="stat-value">${total}</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" style="color: #059669;">${sent}</div>
+                        <div class="stat-label">Sent</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" style="color: #DC2626;">${failed}</div>
+                        <div class="stat-label">Failed</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${successRate}%</div>
+                        <div class="stat-label">Success</div>
+                    </div>
+                </div>
+                
+                ${total > 0 ? `
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${(sent / total) * 100}%"></div>
+                    </div>
+                ` : ''}
+                
+                <div style="margin-top: 12px; font-size: 13px; color: #6B7280;">
+                    Created: ${new Date(c.created_at).toLocaleString()}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function showDetails(campaignId) {
+    try {
+        const [detailsRes, logsRes] = await Promise.all([
+            fetch(`/campaigns/${campaignId}`),
+            fetch(`/campaigns/${campaignId}/logs`)
+        ]);
+        
+        const details = await detailsRes.json();
+        const logs = await logsRes.json();
+        
+        document.getElementById('campaign-name').textContent = details.name;
+        
+        const total = details.total_recipients || 0;
+        const sent = details.sent_count || 0;
+        const failed = details.failed_count || 0;
+        const successRate = total > 0 ? Math.round((sent / total) * 100) : 0;
+        
+        document.getElementById('campaign-details').innerHTML = `
+            <div class="detail-row">
+                <div class="detail-label">Status</div>
+                <div class="detail-value">
+                    <span class="status-badge status-${details.status}">${details.status}</span>
+                </div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Subject</div>
+                <div class="detail-value">${details.subject || 'No subject'}</div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Total Recipients</div>
+                <div class="detail-value">${total}</div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Successfully Sent</div>
+                <div class="detail-value" style="color: #059669; font-weight: 600;">${sent}</div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Failed</div>
+                <div class="detail-value" style="color: #DC2626; font-weight: 600;">${failed}</div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Success Rate</div>
+                <div class="detail-value">${successRate}%</div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Created</div>
+                <div class="detail-value">${new Date(details.created_at).toLocaleString()}</div>
+            </div>
+            ${details.started_at ? `
+                <div class="detail-row">
+                    <div class="detail-label">Started</div>
+                    <div class="detail-value">${new Date(details.started_at).toLocaleString()}</div>
+                </div>
+            ` : ''}
+            ${details.completed_at ? `
+                <div class="detail-row">
+                    <div class="detail-label">Completed</div>
+                    <div class="detail-value">${new Date(details.completed_at).toLocaleString()}</div>
+                </div>
+            ` : ''}
+        `;
+        
+        if (logs.length > 0) {
+            document.getElementById('campaign-logs').innerHTML = `
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 6px;">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th>Recipient</th>
+                                <th>Status</th>
+                                <th>Time</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logs.map(log => `
+                                <tr>
+                                    <td>${log.recipient_email}</td>
+                                    <td class="log-status-${log.status}">${log.status}</td>
+                                    <td>${new Date(log.sent_at).toLocaleString()}</td>
+                                    <td style="color: #DC2626; font-size: 12px;">${log.error_message || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 12px; font-size: 13px; color: #6B7280;">
+                    Showing ${logs.length} delivery logs
+                </div>
+            `;
+        } else {
+            document.getElementById('campaign-logs').innerHTML = `
+                <div style="text-align: center; padding: 32px; color: #9CA3AF; border: 1px solid #E5E7EB; border-radius: 6px;">
+                    No delivery logs available
+                </div>
+            `;
+        }
+        
+        document.getElementById('details-modal').style.display = 'flex';
+    } catch (e) {
+        alert('Error loading campaign details: ' + e.message);
+    }
+}
+
+function closeModal() {
+    document.getElementById('details-modal').style.display = 'none';
+}
+
+loadCampaigns();
+{% endraw %}
+</script>
+{% endblock %}

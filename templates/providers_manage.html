@@ -1,0 +1,453 @@
+{% extends "base_app.html" %}
+
+{% block page_title %}Providers{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="font-size: 24px; font-weight: 600;">Email Providers</h2>
+        <button class="btn btn-primary" onclick="showAddProvider()">Add Provider</button>
+    </div>
+    
+    <div class="alert alert-info" style="margin-bottom: 24px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; vertical-align: middle; margin-right: 8px;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        For Purelymail: Use SMTP with host: smtp.purelymail.com, port: 587
+    </div>
+    
+    {% if providers %}
+    <div class="grid grid-2" style="gap: 20px;">
+        {% for provider in providers %}
+        <div class="card" style="position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+                <div>
+                    <div style="font-size: 12px; text-transform: uppercase; color: #6B7280; font-weight: 600; margin-bottom: 4px;">
+                        {{ provider.provider_type }}
+                    </div>
+                    <div style="font-size: 16px; font-weight: 600; color: #111827;">
+                        {{ provider.sender_email }}
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-icon" onclick="editProvider({{ provider.id }})" title="Edit">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="btn-icon" onclick="deleteProvider({{ provider.id }})" title="Delete">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                {% if provider.is_verified %}
+                <span class="badge badge-success">✓ Verified</span>
+                {% else %}
+                <span class="badge badge-warning">⚠ Not Verified</span>
+                {% endif %}
+                
+                {% if provider.health_status == 'healthy' %}
+                <span class="badge badge-success">Healthy</span>
+                {% elif provider.health_status == 'error' %}
+                <span class="badge badge-error">Error</span>
+                {% endif %}
+            </div>
+            
+            <div style="font-size: 13px; color: #6B7280; margin-bottom: 16px;">
+                Rate Limit: {{ provider.rate_limit }}/min
+            </div>
+            
+            {% if not provider.is_verified %}
+            <button class="btn btn-primary" style="width: 100%;" onclick="verifyProvider({{ provider.id }})">
+                Verify Connection
+            </button>
+            {% else %}
+            <button class="btn btn-secondary" style="width: 100%;" onclick="verifyProvider({{ provider.id }})">
+                Re-verify
+            </button>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card" style="text-align: center; padding: 64px 32px;">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto 16px; color: #D1D5DB;">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+        </svg>
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">No providers yet</h3>
+        <p style="color: #6B7280; margin-bottom: 24px;">Add your first email provider to start sending campaigns</p>
+        <button class="btn btn-primary" onclick="showAddProvider()">Add Provider</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add/Edit Provider Modal -->
+<div id="provider-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3 id="modal-title">Add Email Provider</h3>
+            <button class="btn-icon" onclick="closeModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div id="message"></div>
+            
+            <div class="form-group">
+                <label class="form-label">Provider Type</label>
+                <select id="provider-type" class="form-input" onchange="updateFields()">
+                    <option value="">Select provider...</option>
+                    <option value="smtp">SMTP (Purelymail, Gmail, etc.)</option>
+                    <option value="sendgrid">SendGrid</option>
+                    <option value="mailgun">Mailgun</option>
+                    <option value="ses">AWS SES</option>
+                    <option value="brevo">Brevo</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Sender Email</label>
+                <input type="email" id="sender-email" class="form-input" placeholder="your@email.com">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Sender Name (Optional)</label>
+                <input type="text" id="sender-name" class="form-input" placeholder="Your Name">
+            </div>
+            
+            <div id="credential-fields"></div>
+        </div>
+        
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveProvider()">Save Provider</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-icon {
+    padding: 6px;
+    background: none;
+    border: none;
+    color: #6B7280;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.btn-icon:hover {
+    background: #F3F4F6;
+    color: #111827;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid #E5E7EB;
+}
+
+.message {
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.message-success {
+    background: #DCFCE7;
+    color: #166534;
+    border: 1px solid #86EFAC;
+}
+
+.message-error {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+}
+</style>
+
+<script>
+{% raw %}
+let currentProviderId = null;
+
+const providerSchemas = {
+    smtp: [
+        {name: 'host', label: 'SMTP Host', type: 'text', placeholder: 'smtp.purelymail.com'},
+        {name: 'port', label: 'Port', type: 'number', placeholder: '587'},
+        {name: 'username', label: 'Username', type: 'text', placeholder: 'your@email.com'},
+        {name: 'password', label: 'Password', type: 'password', placeholder: 'Your password'}
+    ],
+    sendgrid: [
+        {name: 'api_key', label: 'API Key', type: 'password', placeholder: 'SG.xxxxx'}
+    ],
+    mailgun: [
+        {name: 'api_key', label: 'API Key', type: 'password', placeholder: 'key-xxxxx'},
+        {name: 'domain', label: 'Domain', type: 'text', placeholder: 'mg.yourdomain.com'}
+    ],
+    ses: [
+        {name: 'access_key', label: 'Access Key', type: 'password', placeholder: 'AKIA...'},
+        {name: 'secret_key', label: 'Secret Key', type: 'password', placeholder: 'xxxxx'},
+        {name: 'region', label: 'Region', type: 'text', placeholder: 'us-east-1'}
+    ],
+    brevo: [
+        {name: 'api_key', label: 'API Key', type: 'password', placeholder: 'xkeysib-xxxxx'}
+    ]
+};
+
+function showAddProvider() {
+    currentProviderId = null;
+    document.getElementById('modal-title').textContent = 'Add Email Provider';
+    document.getElementById('provider-type').value = '';
+    document.getElementById('sender-email').value = '';
+    document.getElementById('sender-name').value = '';
+    document.getElementById('credential-fields').innerHTML = '';
+    document.getElementById('message').innerHTML = '';
+    document.getElementById('provider-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('provider-modal').style.display = 'none';
+}
+
+function updateFields() {
+    const type = document.getElementById('provider-type').value;
+    const container = document.getElementById('credential-fields');
+    
+    if (!type || !providerSchemas[type]) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const fields = providerSchemas[type];
+    container.innerHTML = fields.map(field => `
+        <div class="form-group">
+            <label class="form-label">${field.label}</label>
+            <input 
+                type="${field.type}" 
+                id="cred-${field.name}" 
+                class="form-input" 
+                placeholder="${field.placeholder}"
+            >
+        </div>
+    `).join('');
+}
+
+async function saveProvider() {
+    const type = document.getElementById('provider-type').value;
+    const email = document.getElementById('sender-email').value;
+    const name = document.getElementById('sender-name').value;
+    
+    if (!type || !email) {
+        showMessage('Please fill in provider type and sender email', 'error');
+        return;
+    }
+    
+    const credentials = {};
+    const fields = providerSchemas[type] || [];
+    
+    for (const field of fields) {
+        const input = document.getElementById(`cred-${field.name}`);
+        if (input) {
+            credentials[field.name] = input.value;
+        }
+    }
+    
+    try {
+        let response;
+        if (currentProviderId) {
+            // Update existing provider
+            response = await fetch(`/providers/${currentProviderId}/update`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    sender_email: email,
+                    sender_name: name,
+                    credentials: credentials
+                })
+            });
+        } else {
+            // Create new provider
+            response = await fetch('/providers/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    provider_type: type,
+                    sender_email: email,
+                    sender_name: name,
+                    credentials: credentials
+                })
+            });
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage(currentProviderId ? 'Provider updated successfully!' : 'Provider added successfully!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showMessage('Error: ' + (data.error || 'Failed to save provider'), 'error');
+        }
+    } catch (e) {
+        showMessage('Error: ' + e.message, 'error');
+    }
+}
+
+async function verifyProvider(id) {
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.textContent = 'Verifying...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch(`/providers/${id}/verify`, {method: 'POST'});
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✓ Provider verified successfully!\n\nYou can now use this provider to send campaigns.');
+            location.reload();
+        } else {
+            const error = data.error || 'Unknown error';
+            let troubleshooting = '\n\nTroubleshooting:\n';
+            
+            if (error.includes('timed out') || error.includes('timeout')) {
+                troubleshooting += '• Check your internet connection\n';
+                troubleshooting += '• Verify the SMTP host and port are correct\n';
+                troubleshooting += '• Try port 465 (SSL) instead of 587 (TLS)\n';
+                troubleshooting += '• Check if your firewall is blocking the connection';
+            } else if (error.includes('authentication') || error.includes('login') || error.includes('password')) {
+                troubleshooting += '• Double-check your username and password\n';
+                troubleshooting += '• For Gmail: Use an App Password, not your regular password\n';
+                troubleshooting += '• For Purelymail: Use your account password\n';
+                troubleshooting += '• Make sure SMTP is enabled in your email provider';
+            } else if (error.includes('certificate') || error.includes('SSL') || error.includes('TLS')) {
+                troubleshooting += '• Try using port 465 instead of 587\n';
+                troubleshooting += '• Check if your system time is correct\n';
+                troubleshooting += '• Update your Python SSL certificates';
+            } else {
+                troubleshooting += '• Verify all credentials are correct\n';
+                troubleshooting += '• Check provider documentation for SMTP settings\n';
+                troubleshooting += '• Try deleting and re-adding the provider';
+            }
+            
+            alert('✗ Verification failed:\n\n' + error + troubleshooting);
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+async function editProvider(id) {
+    try {
+        const response = await fetch(`/providers/${id}`);
+        const data = await response.json();
+        
+        if (!data.id) {
+            alert('Error loading provider');
+            return;
+        }
+        
+        currentProviderId = id;
+        document.getElementById('modal-title').textContent = 'Edit Email Provider';
+        document.getElementById('provider-type').value = data.provider_type;
+        document.getElementById('sender-email').value = data.sender_email;
+        document.getElementById('sender-name').value = data.sender_name || '';
+        
+        // Update fields for this provider type
+        updateFields();
+        
+        // Populate credential fields
+        const fields = providerSchemas[data.provider_type] || [];
+        for (const field of fields) {
+            const input = document.getElementById(`cred-${field.name}`);
+            if (input && data.credentials[field.name]) {
+                input.value = data.credentials[field.name];
+            }
+        }
+        
+        document.getElementById('provider-modal').style.display = 'flex';
+    } catch (e) {
+        alert('Error loading provider: ' + e.message);
+    }
+}
+
+async function deleteProvider(id) {
+    if (!confirm('Are you sure you want to delete this provider?')) return;
+    
+    try {
+        const response = await fetch(`/providers/${id}`, {method: 'DELETE'});
+        const data = await response.json();
+        
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to delete provider'));
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+function showMessage(text, type) {
+    document.getElementById('message').innerHTML = `<div class="message message-${type}">${text}</div>`;
+}
+{% endraw %}
+</script>
+{% endblock %}

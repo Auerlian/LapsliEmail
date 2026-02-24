@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Bulk Email Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-left">
+            <div class="auth-left-content">
+                <h1>Get Started</h1>
+                <p>Create your account and start sending professional email campaigns in minutes.</p>
+            </div>
+        </div>
+        <div class="auth-right">
+            <div class="auth-card">
+                <h2>Create Account</h2>
+                <p class="subtitle">Sign up to access the platform</p>
+                
+                <div id="message"></div>
+                
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="email" placeholder="you@company.com" autocomplete="email">
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="Create a password" autocomplete="new-password">
+                </div>
+                
+                <button onclick="signup()" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Create Account</button>
+                
+                <div class="auth-link">
+                    Already have an account? <a href="/login">Sign in</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function signup() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const messageEl = document.getElementById('message');
+            
+            if (!email || !password) {
+                messageEl.innerHTML = '<div class="message message-error">Please enter email and password</div>';
+                return;
+            }
+            
+            if (password.length < 6) {
+                messageEl.innerHTML = '<div class="message message-error">Password must be at least 6 characters</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/auth/signup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email, password})
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    messageEl.innerHTML = '<div class="message message-success">Account created! Redirecting...</div>';
+                    setTimeout(() => window.location.href = '/dashboard/', 500);
+                } else {
+                    messageEl.innerHTML = `<div class="message message-error">${data.error || 'Signup failed'}</div>`;
+                }
+            } catch (e) {
+                messageEl.innerHTML = `<div class="message message-error">Error: ${e.message}</div>`;
+            }
+        }
+        
+        document.getElementById('email').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('password').focus();
+        });
+        document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') signup();
+        });
+    </script>
+</body>
+</html>

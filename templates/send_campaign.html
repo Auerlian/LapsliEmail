@@ -1,0 +1,415 @@
+{% extends "base_app.html" %}
+
+{% block page_title %}Send Campaign{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 800px; margin: 0 auto;">
+    <div class="card-header">
+        <h3 class="card-title">Send Email Campaign</h3>
+    </div>
+    
+    <div id="message"></div>
+    
+    <form id="campaign-form">
+        <div class="form-group">
+            <label class="form-label">Campaign Name</label>
+            <input type="text" id="campaign-name" class="form-input" placeholder="My Campaign" required>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Email Provider</label>
+            <select id="provider-id" class="form-input" required>
+                <option value="">Select a provider...</option>
+            </select>
+            <small class="form-help">Choose which email provider to send from</small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Recipient List</label>
+            <select id="list-id" class="form-input" required>
+                <option value="">Select a list...</option>
+            </select>
+            <small class="form-help">Choose which recipients to send to</small>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Email Template</label>
+            <select id="template-id" class="form-input" required onchange="loadTemplateVariables()">
+                <option value="">Select a template...</option>
+            </select>
+            <small class="form-help">Choose the email template to send</small>
+        </div>
+        
+        <div id="variable-mapping" style="display: none; margin-top: 24px; padding: 20px; background: #F9FAFB; border-radius: 6px;">
+            <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">Variable Mapping</h4>
+            <p style="font-size: 13px; color: #6B7280; margin-bottom: 16px;">
+                Map template variables to recipient list fields. Use [variable] or {{variable}} in your templates.
+            </p>
+            <div id="variable-fields"></div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Subject Line</label>
+            <input type="text" id="subject" class="form-input" placeholder="Hello [name]!" required>
+            <small class="form-help">Use [variable] for personalization</small>
+        </div>
+        
+        <div id="preview-section" style="display: none; margin-top: 24px; padding: 20px; background: #F9FAFB; border-radius: 6px;">
+            <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">Campaign Summary</h4>
+            <div id="campaign-summary"></div>
+        </div>
+        
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+            <button type="button" id="preview-btn" class="btn btn-secondary">Preview</button>
+            <button type="submit" id="send-btn" class="btn btn-primary">Send Campaign</button>
+        </div>
+    </form>
+    
+    <div id="progress-section" style="display: none; margin-top: 24px;">
+        <h4 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Sending Progress</h4>
+        <div style="background: #F3F4F6; border-radius: 8px; height: 8px; overflow: hidden;">
+            <div id="progress-bar" style="background: #2563EB; height: 100%; width: 0%; transition: width 0.3s;"></div>
+        </div>
+        <p id="progress-text" style="margin-top: 8px; font-size: 14px; color: #6B7280;"></p>
+    </div>
+</div>
+
+<style>
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    border: 1px solid #D1D5DB;
+    border-radius: 6px;
+    transition: border-color 0.15s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #2563EB;
+}
+
+.form-help {
+    display: block;
+    font-size: 13px;
+    color: #6B7280;
+    margin-top: 4px;
+}
+
+.message {
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.message-error {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+}
+
+.message-success {
+    background: #DCFCE7;
+    color: #166534;
+    border: 1px solid #86EFAC;
+}
+
+.message-info {
+    background: #DBEAFE;
+    color: #1E40AF;
+    border: 1px solid #93C5FD;
+}
+</style>
+
+<script>
+{% raw %}
+let providers = [];
+let lists = [];
+let templates = [];
+let currentTemplate = null;
+let listFields = [];
+let variableMapping = {};
+
+async function loadData() {
+    try {
+        const [providersRes, listsRes, templatesRes] = await Promise.all([
+            fetch('/providers/list'),
+            fetch('/lists/list'),
+            fetch('/templates/list')
+        ]);
+        
+        providers = await providersRes.json();
+        lists = await listsRes.json();
+        templates = await templatesRes.json();
+        
+        populateDropdowns();
+    } catch (e) {
+        showMessage('Failed to load data: ' + e.message, 'error');
+    }
+}
+
+function populateDropdowns() {
+    const providerSelect = document.getElementById('provider-id');
+    const listSelect = document.getElementById('list-id');
+    const templateSelect = document.getElementById('template-id');
+    
+    providers.filter(p => p.is_verified).forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = `${p.sender_email} (${p.type})`;
+        providerSelect.appendChild(option);
+    });
+    
+    lists.forEach(l => {
+        const option = document.createElement('option');
+        option.value = l.id;
+        option.textContent = `${l.name} (${l.recipient_count} recipients)`;
+        listSelect.appendChild(option);
+    });
+    
+    templates.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.id;
+        option.textContent = t.name;
+        templateSelect.appendChild(option);
+    });
+}
+
+async function loadTemplateVariables() {
+    const templateId = document.getElementById('template-id').value;
+    const listId = document.getElementById('list-id').value;
+    
+    console.log('Loading template variables for template:', templateId, 'list:', listId);
+    
+    if (!templateId) {
+        document.getElementById('variable-mapping').style.display = 'none';
+        return;
+    }
+    
+    try {
+        // Get template details
+        const templateRes = await fetch(`/templates/${templateId}`);
+        currentTemplate = await templateRes.json();
+        
+        console.log('Template loaded:', currentTemplate);
+        console.log('Template variables:', currentTemplate.variables);
+        
+        // Get list fields if a list is selected
+        if (listId) {
+            const listRes = await fetch(`/lists/${listId}`);
+            const listData = await listRes.json();
+            
+            console.log('List loaded:', listData);
+            
+            // Extract available fields from first recipient
+            if (listData.recipients && listData.recipients.length > 0) {
+                const firstRecipient = listData.recipients[0];
+                listFields = ['email', 'name']; // Always available
+                
+                // Add any custom fields from recipient data
+                if (firstRecipient.data) {
+                    Object.keys(firstRecipient.data).forEach(key => {
+                        if (!listFields.includes(key)) {
+                            listFields.push(key);
+                        }
+                    });
+                }
+            }
+            
+            console.log('Available list fields:', listFields);
+        } else {
+            // No list selected, use default fields
+            listFields = ['email', 'name'];
+        }
+        
+        // Show variable mapping if template has variables
+        if (currentTemplate.variables && currentTemplate.variables.length > 0) {
+            console.log('Rendering variable mapping for:', currentTemplate.variables);
+            renderVariableMapping(currentTemplate.variables);
+        } else {
+            console.log('No variables found in template');
+            document.getElementById('variable-mapping').style.display = 'none';
+        }
+    } catch (e) {
+        console.error('Error loading template:', e);
+        showMessage('Error loading template: ' + e.message, 'error');
+    }
+}
+
+function renderVariableMapping(variables) {
+    const container = document.getElementById('variable-fields');
+    
+    console.log('Rendering variables:', variables, 'with fields:', listFields);
+    
+    if (!variables || variables.length === 0) {
+        document.getElementById('variable-mapping').style.display = 'none';
+        return;
+    }
+    
+    container.innerHTML = variables.map(varName => `
+        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px;">
+            <div style="flex: 0 0 120px; font-weight: 600; color: #374151;">
+                [${varName}]
+            </div>
+            <div style="flex: 1;">
+                <select id="map-${varName}" class="form-input" onchange="updateMapping('${varName}', this.value)">
+                    <option value="">Select field...</option>
+                    ${listFields.map(field => `
+                        <option value="${field}" ${field === varName ? 'selected' : ''}>
+                            ${field}
+                        </option>
+                    `).join('')}
+                    <option value="_custom">Custom value...</option>
+                </select>
+            </div>
+            <div style="flex: 1; display: none;" id="custom-${varName}">
+                <input type="text" class="form-input" placeholder="Enter custom value" 
+                       onchange="updateMapping('${varName}', this.value, true)">
+            </div>
+        </div>
+    `).join('');
+    
+    // Initialize mapping with auto-matched fields
+    variables.forEach(varName => {
+        if (listFields.includes(varName)) {
+            variableMapping[varName] = { type: 'field', value: varName };
+        }
+    });
+    
+    console.log('Initial variable mapping:', variableMapping);
+    
+    document.getElementById('variable-mapping').style.display = 'block';
+}
+
+function updateMapping(varName, value, isCustom = false) {
+    if (value === '_custom') {
+        document.getElementById(`custom-${varName}`).style.display = 'block';
+        document.getElementById(`map-${varName}`).parentElement.style.flex = '0 0 200px';
+    } else {
+        document.getElementById(`custom-${varName}`).style.display = 'none';
+        document.getElementById(`map-${varName}`).parentElement.style.flex = '1';
+        
+        if (isCustom) {
+            variableMapping[varName] = { type: 'custom', value: value };
+        } else {
+            variableMapping[varName] = { type: 'field', value: value };
+        }
+    }
+}
+
+// Update list selection to reload variable mapping
+document.getElementById('list-id').addEventListener('change', () => {
+    loadTemplateVariables();
+});
+
+document.getElementById('preview-btn').addEventListener('click', async () => {
+    const providerId = document.getElementById('provider-id').value;
+    const listId = document.getElementById('list-id').value;
+    const templateId = document.getElementById('template-id').value;
+    
+    if (!providerId || !listId || !templateId) {
+        showMessage('Please select provider, list, and template', 'error');
+        return;
+    }
+    
+    const provider = providers.find(p => p.id == providerId);
+    const list = lists.find(l => l.id == listId);
+    const template = templates.find(t => t.id == templateId);
+    
+    const summary = `
+        <div style="font-size: 14px; line-height: 1.8;">
+            <strong>Provider:</strong> ${provider.sender_email}<br>
+            <strong>Recipients:</strong> ${list.recipient_count} people<br>
+            <strong>Template:</strong> ${template.name}<br>
+            <strong>Subject:</strong> ${document.getElementById('subject').value}
+        </div>
+    `;
+    
+    document.getElementById('campaign-summary').innerHTML = summary;
+    document.getElementById('preview-section').style.display = 'block';
+});
+
+document.getElementById('campaign-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const campaignName = document.getElementById('campaign-name').value;
+    const providerId = document.getElementById('provider-id').value;
+    const listId = document.getElementById('list-id').value;
+    const templateId = document.getElementById('template-id').value;
+    const subject = document.getElementById('subject').value;
+    
+    if (!campaignName || !providerId || !listId || !templateId || !subject) {
+        showMessage('Please fill in all fields', 'error');
+        return;
+    }
+    
+    // Validate variable mapping
+    if (currentTemplate && currentTemplate.variables) {
+        for (const varName of currentTemplate.variables) {
+            if (!variableMapping[varName] || !variableMapping[varName].value) {
+                showMessage(`Please map the variable: [${varName}]`, 'error');
+                return;
+            }
+        }
+    }
+    
+    document.getElementById('send-btn').disabled = true;
+    document.getElementById('send-btn').textContent = 'Sending...';
+    
+    try {
+        // Create campaign with variable mapping
+        const createRes = await fetch('/campaigns/send-now', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: campaignName,
+                provider_id: parseInt(providerId),
+                list_id: parseInt(listId),
+                template_id: parseInt(templateId),
+                subject: subject,
+                variable_mapping: variableMapping
+            })
+        });
+        
+        const data = await createRes.json();
+        
+        if (data.success) {
+            showMessage(`Campaign sent successfully! Sent: ${data.sent}, Failed: ${data.failed}`, 'success');
+            document.getElementById('campaign-form').reset();
+            document.getElementById('preview-section').style.display = 'none';
+            document.getElementById('variable-mapping').style.display = 'none';
+            variableMapping = {};
+        } else {
+            showMessage('Error: ' + (data.error || 'Failed to send campaign'), 'error');
+        }
+    } catch (e) {
+        showMessage('Error: ' + e.message, 'error');
+    } finally {
+        document.getElementById('send-btn').disabled = false;
+        document.getElementById('send-btn').textContent = 'Send Campaign';
+    }
+});
+
+function showMessage(text, type) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.innerHTML = `<div class="message message-${type}">${text}</div>`;
+    setTimeout(() => messageDiv.innerHTML = '', 5000);
+}
+
+loadData();
+{% endraw %}
+</script>
+{% endblock %}

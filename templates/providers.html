@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Providers{% endblock %}
+
+{% block content %}
+<h1>Email Providers</h1>
+
+<div class="card">
+    <button class="btn btn-primary" onclick="showAddProvider()">Add Provider</button>
+</div>
+
+<div class="card">
+    <table class="table" id="providers-table">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Sender Email</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="add-provider-modal" style="display:none;">
+    <div class="card">
+        <h2>Add Provider</h2>
+        <form id="add-provider-form" onsubmit="submitProvider(event)">
+            <div class="form-group">
+                <label>Provider Type</label>
+                <select name="provider_type" id="provider-type" onchange="updateCredentialFields()" required>
+                    <option value="">Select provider...</option>
+                    <option value="brevo">Brevo (Sendinblue)</option>
+                    <option value="sendgrid">SendGrid</option>
+                    <option value="mailgun">Mailgun</option>
+                    <option value="ses">Amazon SES</option>
+                    <option value="smtp">SMTP (Advanced)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Sender Email</label>
+                <input type="email" name="sender_email" id="sender-email" required>
+            </div>
+            <div class="form-group">
+                <label>Sender Name (Optional)</label>
+                <input type="text" name="sender_name" id="sender-name">
+            </div>
+            
+            <div id="credential-fields"></div>
+            
+            <button type="submit" class="btn btn-primary">Add Provider</button>
+            <button type="button" class="btn" onclick="hideAddProvider()">Cancel</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const credentialTemplates = {
+    brevo: `
+        <div class="form-group">
+            <label>Brevo API Key</label>
+            <input type="text" name="api_key" placeholder="xkeysib-..." required>
+            <small>Get your API key from Brevo dashboard → SMTP & API → API Keys</small>
+        </div>
+    `,
+    sendgrid: `
+        <div class="form-group">
+            <label>SendGrid API Key</label>
+            <input type="text" name="api_key" placeholder="SG..." required>
+        </div>
+    `,
+    mailgun: `
+        <div class="form-group">
+            <label>Mailgun API Key</label>
+            <input type="text" name="api_key" required>
+        </div>
+        <div class="form-group">
+            <label>Mailgun Domain</label>
+            <input type="text" name="domain" placeholder="mg.yourdomain.com" required>
+        </div>
+    `,
+    ses: `
+        <div class="form-group">
+            <label>AWS Access Key ID</label>
+            <input type="text" name="access_key_id" required>
+        </div>
+        <div class="form-group">
+            <label>AWS Secret Access Key</label>
+            <input type="password" name="secret_access_key" required>
+        </div>
+        <div class="form-group">
+            <label>AWS Region</label>
+            <input type="text" name="region" value="us-east-1" required>
+        </div>
+    `,
+    smtp: `
+        <div class="form-group">
+            <label>SMTP Host</label>
+            <input type="text" name="host" placeholder="smtp.example.com" required>
+        </div>
+        <div class="form-group">
+            <label>SMTP Port</label>
+            <input type="number" name="port" value="587" required>
+        </div>
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" name="username" required>
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required>
+        </div>
+    `
+};
+
+function updateCredentialFields() {
+    const type = document.getElementById('provider-type').value;
+    const container = document.getElementById('credential-fields');
+    container.innerHTML = credentialTemplates[type] || '';
+}
+
+async function loadProviders() {
+    const providers = await API.get('/providers/list');
+    const tbody = document.querySelector('#providers-table tbody');
+    tbody.innerHTML = providers.map(p => `
+        <tr>
+            <td>${p.type}</td>
+            <td>${p.sender_email}</td>
+            <td><span class="badge ${p.is_verified ? 'badge-success' : 'badge-pending'}">${p.is_verified ? 'Verified' : 'Ready'}</span></td>
+            <td><button class="btn btn-danger" onclick="deleteProvider(${p.id})">Delete</button></td>
+        </tr>
+    `).join('');
+}
+
+function showAddProvider() {
+    document.getElementById('add-provider-modal').style.display = 'block';
+}
+
+function hideAddProvider() {
+    document.getElementById('add-provider-modal').style.display = 'none';
+    document.getElementById('add-provider-form').reset();
+    document.getElementById('credential-fields').innerHTML = '';
+}
+
+async function submitProvider(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    
+    const credentials = {};
+    const data = {
+        provider_type: formData.get('provider_type'),
+        sender_email: formData.get('sender_email'),
+        sender_name: formData.get('sender_name')
+    };
+    
+    for (let [key, value] of formData.entries()) {
+        if (!['provider_type', 'sender_email', 'sender_name'].includes(key)) {
+            credentials[key] = value;
+        }
+    }
+    
+    data.credentials = credentials;
+    
+    const result = await API.post('/providers/add', data);
+    if (result.success) {
+        hideAddProvider();
+        loadProviders();
+        showMessage('Provider added successfully!', 'success');
+    } else {
+        showMessage(result.error || 'Failed to add provider', 'error');
+    }
+}
+
+async function deleteProvider(id) {
+    if (confirm('Delete this provider?')) {
+        await API.delete(`/providers/${id}`);
+        loadProviders();
+    }
+}
+
+function showMessage(msg, type) {
+    alert(msg);
+}
+
+loadProviders();
+</script>
+{% endblock %}

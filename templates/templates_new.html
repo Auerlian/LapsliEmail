@@ -1,0 +1,326 @@
+{% extends "base_app.html" %}
+
+{% block page_title %}Templates{% endblock %}
+
+{% block content %}
+<div class="template-layout">
+    <div class="template-sidebar">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Templates</h3>
+                <button class="btn btn-primary btn-sm" onclick="newTemplate()">New</button>
+            </div>
+            
+            <div id="template-list">
+                {% if templates %}
+                {% for template in templates %}
+                <div class="template-item" onclick="loadTemplate({{ template.id }})">
+                    <div class="template-item-name">{{ template.name }}</div>
+                    <div class="template-item-subject">{{ template.subject }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state-small">
+                    <div class="empty-state-text">No templates yet</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="template-editor">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Editor</h3>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" onclick="checkSpam()">Check Spam</button>
+                    <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Template Name</label>
+                <input type="text" id="template-name" class="form-input" placeholder="My Template">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Subject</label>
+                <input type="text" id="template-subject" class="form-input" placeholder="Email subject">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">HTML Body</label>
+                <textarea id="template-html" class="form-textarea" rows="12" placeholder="<html>..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Plain Text Fallback (optional)</label>
+                <textarea id="template-text" class="form-textarea" rows="6" placeholder="Plain text version"></textarea>
+            </div>
+            
+            <div id="spam-results"></div>
+        </div>
+    </div>
+    
+    <div class="template-tools">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Variables</h3>
+            </div>
+            
+            <div class="variables-help">
+                <p>Use <code>{{variable}}</code> syntax in your template</p>
+            </div>
+            
+            <div id="detected-variables"></div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">AI Assistant</h3>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Provider</label>
+                <select id="ai-provider" class="form-input">
+                    <option value="openai">OpenAI</option>
+                    <option value="claude">Claude</option>
+                    <option value="gemini">Gemini</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Prompt</label>
+                <textarea id="ai-prompt" class="form-textarea" rows="4" placeholder="Generate a professional email about..."></textarea>
+            </div>
+            
+            <button class="btn btn-primary" onclick="generateWithAI()">Generate</button>
+            
+            <div class="alert alert-info" style="margin-top: 16px; font-size: 12px;">
+                Only variable schema is sent to AI, never recipient data
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.template-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    gap: 24px;
+    height: calc(100vh - 160px);
+}
+
+.template-sidebar {
+    overflow-y: auto;
+}
+
+.template-editor {
+    overflow-y: auto;
+}
+
+.template-tools {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.template-item {
+    padding: 12px;
+    border-bottom: 1px solid var(--gray-100);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.template-item:hover {
+    background: var(--gray-50);
+}
+
+.template-item-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-900);
+    margin-bottom: 4px;
+}
+
+.template-item-subject {
+    font-size: 12px;
+    color: var(--gray-600);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty-state-small {
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.variables-help {
+    padding: 12px;
+    background: var(--gray-50);
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+
+.variables-help p {
+    font-size: 13px;
+    color: var(--gray-600);
+    margin: 0;
+}
+
+.variables-help code {
+    background: var(--white);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: var(--blue);
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+</style>
+
+<script>
+{% raw %}
+let currentTemplateId = null;
+
+function newTemplate() {
+    currentTemplateId = null;
+    document.getElementById('template-name').value = '';
+    document.getElementById('template-subject').value = '';
+    document.getElementById('template-html').value = '';
+    document.getElementById('template-text').value = '';
+    document.getElementById('detected-variables').innerHTML = '';
+}
+
+async function loadTemplate(id) {
+    const response = await fetch(`/templates/${id}`);
+    const template = await response.json();
+    
+    currentTemplateId = id;
+    document.getElementById('template-name').value = template.name;
+    document.getElementById('template-subject').value = template.subject;
+    document.getElementById('template-html').value = template.html_body;
+    document.getElementById('template-text').value = template.text_body || '';
+    
+    if (template.variables && template.variables.length > 0) {
+        showVariables(template.variables);
+    }
+}
+
+function showVariables(variables) {
+    const html = variables.map(v => `
+        <div style="padding: 8px; background: var(--gray-50); border-radius: 4px; margin-bottom: 8px; cursor: pointer;" onclick="insertVariable('${v}')">
+            <code style="font-size: 12px; color: var(--blue);">{{${v}}}</code>
+        </div>
+    `).join('');
+    
+    document.getElementById('detected-variables').innerHTML = html;
+}
+
+function insertVariable(name) {
+    const textarea = document.getElementById('template-html');
+    const pos = textarea.selectionStart;
+    const text = textarea.value;
+    textarea.value = text.substring(0, pos) + `{{${name}}}` + text.substring(pos);
+    textarea.focus();
+}
+
+async function saveTemplate() {
+    const name = document.getElementById('template-name').value;
+    const subject = document.getElementById('template-subject').value;
+    const htmlBody = document.getElementById('template-html').value;
+    const textBody = document.getElementById('template-text').value;
+    
+    if (!name || !subject || !htmlBody) {
+        alert('Please fill in required fields');
+        return;
+    }
+    
+    const response = await fetch('/templates/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            id: currentTemplateId,
+            name: name,
+            subject: subject,
+            html_body: htmlBody,
+            text_body: textBody
+        })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+        alert('Template saved');
+        location.reload();
+    } else {
+        alert(data.error || 'Failed to save template');
+    }
+}
+
+async function checkSpam() {
+    const subject = document.getElementById('template-subject').value;
+    const body = document.getElementById('template-html').value;
+    
+    const response = await fetch('/templates/spam-check', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({subject: subject, body: body})
+    });
+    
+    const data = await response.json();
+    
+    const resultsDiv = document.getElementById('spam-results');
+    
+    if (data.is_spam) {
+        resultsDiv.innerHTML = `
+            <div class="alert alert-warning">
+                <strong>Spam flags detected:</strong><br>
+                ${data.flags.join('<br>')}
+            </div>
+        `;
+    } else {
+        resultsDiv.innerHTML = `
+            <div class="alert alert-success">
+                No spam flags detected
+            </div>
+        `;
+    }
+}
+
+async function generateWithAI() {
+    const provider = document.getElementById('ai-provider').value;
+    const prompt = document.getElementById('ai-prompt').value;
+    
+    if (!prompt) {
+        alert('Please enter a prompt');
+        return;
+    }
+    
+    const response = await fetch('/templates/ai/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            provider: provider,
+            prompt: prompt,
+            variables: []
+        })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+        document.getElementById('template-html').value = data.content;
+        alert('Content generated. Data sent to AI: ' + data.data_sent_to_ai);
+    } else {
+        alert(data.error || 'Failed to generate content');
+    }
+}
+{% endraw %}
+</script>
+{% endblock %}

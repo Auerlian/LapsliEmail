@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Campaigns{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h1 style="font-size: 32px; font-weight: 600;">Campaigns</h1>
+    <button class="btn btn-primary" onclick="showCreateCampaign()">Create Campaign</button>
+</div>
+
+<div class="card">
+    <table class="table" id="campaigns-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Sent</th>
+                <th>Failed</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 48px;">
+                    No campaigns yet. Create your first campaign to get started.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadCampaigns() {
+    try {
+        const campaigns = await API.get('/campaigns/list');
+        const tbody = document.querySelector('#campaigns-table tbody');
+        
+        if (campaigns.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 48px;">
+                        No campaigns yet. Create your first campaign to get started.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = campaigns.map(c => `
+            <tr>
+                <td style="font-weight: 600;">${c.name}</td>
+                <td><span class="badge badge-${c.status === 'completed' ? 'success' : c.status === 'sending' ? 'pending' : 'error'}">${c.status}</span></td>
+                <td>${c.sent_count}</td>
+                <td>${c.failed_count}</td>
+                <td>${formatDate(c.created_at)}</td>
+                <td>
+                    ${c.status === 'draft' ? `<button class="btn btn-primary" onclick="sendCampaign(${c.id})">Send</button>` : ''}
+                    <button class="btn btn-secondary" onclick="viewLogs(${c.id})">Logs</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load campaigns:', e);
+    }
+}
+
+async function sendCampaign(id) {
+    if (confirm('Send this campaign?')) {
+        await API.post(`/campaigns/${id}/send`, {});
+        loadCampaigns();
+    }
+}
+
+function showCreateCampaign() {
+    alert('Campaign creation wizard coming soon! For now, use the API or add campaigns via the database.');
+}
+
+loadCampaigns();
+</script>
+{% endblock %}
