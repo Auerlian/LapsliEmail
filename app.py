@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, session
+from flask_cors import CORS
 import smtplib
 import ssl
 from email.mime.text import MIMEText
@@ -13,7 +14,8 @@ import io
 from html.parser import HTMLParser
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(16)
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
+CORS(app)
 
 # Single source of truth for email template
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'static', 'email.html')
