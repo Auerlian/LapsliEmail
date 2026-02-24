@@ -26,10 +26,18 @@ class TemplateEngine:
     @staticmethod
     def extract_variables(template: str) -> list:
         """Extract variables from template. Supports both [variable] and {{variable}} syntax."""
-        # Find [variable] patterns
-        square_vars = re.findall(r'\[(\w+)\]', template)
+        # Find [variable] patterns - allow letters, numbers, spaces, underscores, hyphens
+        # Exclude HTML conditional comments like [if !mso] and [endif]
+        square_vars = re.findall(r'\[([A-Za-z][A-Za-z0-9\s_-]*)\]', template)
+        
+        # Filter out HTML conditional comment keywords
+        html_conditionals = {'if', 'endif', 'else', 'elseif', 'mso'}
+        square_vars = [v.strip() for v in square_vars if v.strip().lower() not in html_conditionals and not v.strip().startswith('if ')]
+        
         # Find {{variable}} patterns
-        curly_vars = re.findall(r'\{\{(\w+)\}\}', template)
+        curly_vars = re.findall(r'\{\{([A-Za-z][A-Za-z0-9\s_-]*)\}\}', template)
+        curly_vars = [v.strip() for v in curly_vars]
+        
         # Combine and deduplicate
         return list(set(square_vars + curly_vars))
     
