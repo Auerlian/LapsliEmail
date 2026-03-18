@@ -281,12 +281,12 @@
             <!-- Tab 1: Setup -->
             <div class="tab-content active">
                 <h2 style="margin-bottom: 12px; color: #2d3748; font-size: 24px;">📮 Email Server Setup</h2>
-                <p style="color: #718096; margin-bottom: 32px; font-size: 15px;">Configure your SMTP server to send emails. We recommend using Brevo (free tier available).</p>
+                <p style="color: #718096; margin-bottom: 32px; font-size: 15px;">Configure your SMTP server to send emails. This is prefilled for Purelymail + Glowbal sender.</p>
                 
                 <div class="form-group-inline">
                     <div class="form-group">
-                        <label>SMTP Server <span class="label-hint">(e.g., smtp-relay.brevo.com)</span></label>
-                        <input type="text" id="smtp_server" value="smtp-relay.brevo.com" placeholder="smtp-relay.brevo.com">
+                        <label>SMTP Server <span class="label-hint">(e.g., smtp.purelymail.com)</span></label>
+                        <input type="text" id="smtp_server" value="smtp.purelymail.com" placeholder="smtp.purelymail.com">
                     </div>
 
                     <div class="form-group">
@@ -297,7 +297,7 @@
 
                 <div class="form-group">
                     <label>SMTP Login <span class="label-hint">(your SMTP username)</span></label>
-                    <input type="text" id="email_user" placeholder="your-smtp-login@smtp-brevo.com">
+                    <input type="text" id="email_user" value="glowbal@purelymail.com" placeholder="your-email@purelymail.com">
                 </div>
 
                 <div class="form-group">
@@ -311,13 +311,13 @@
 
                 <div class="form-group">
                     <label>From Email Address <span class="label-hint">(sender email)</span></label>
-                    <input type="email" id="from_email" value="hello@morningbuddy.co.uk" placeholder="your-email@domain.com">
+                    <input type="email" id="from_email" value="glowbal@purelymail.com" placeholder="your-email@domain.com">
                 </div>
 
                 <div class="info-box">
                     <strong>💡 Need an SMTP server?</strong><br>
-                    We recommend <a href="https://www.brevo.com" target="_blank" style="color: #667eea; font-weight: 600;">Brevo</a> (formerly Sendinblue) - they offer 300 free emails per day!<br>
-                    Other options: Gmail (with App Password), SendGrid, Mailgun, Amazon SES
+                    Recommended here: <a href="https://purelymail.com" target="_blank" style="color: #667eea; font-weight: 600;">Purelymail</a> for glowbal@purelymail.com.<br>
+                    Other options: Gmail (App Password), SendGrid, Mailgun, Amazon SES
                 </div>
             </div>
 
@@ -422,7 +422,7 @@
         <div class="status-bar">
             <div class="status-text" id="statusText">Ready to send</div>
             <div class="footer-branding">
-                Powered by <a href="https://morningbuddy.co.uk" target="_blank">Morning Buddy</a> • Free bulk email service
+                Powered by <a href="https://glowbal.co.uk" target="_blank">GlowBal</a> • Bulk email service
             </div>
             <div id="statusBadge"></div>
         </div>

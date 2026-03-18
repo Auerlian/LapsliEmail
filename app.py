@@ -144,7 +144,7 @@ def add_email_branding(html_content):
     """Add BulkMailer branding footer to HTML emails"""
     branding_footer = '''
     <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e2e8f0; text-align: center; font-size: 12px; color: #718096;">
-        <p style="margin: 0;">Sent with ❤️ using <a href="https://morningbuddy.co.uk" style="color: #667eea; text-decoration: none; font-weight: 600;">BulkMailer</a> - Free bulk email service</p>
+        <p style="margin: 0;">Sent with ❤️ using <a href="https://glowbal.co.uk" style="color: #667eea; text-decoration: none; font-weight: 600;">GlowBal Mailer</a></p>
     </div>
     '''
     
