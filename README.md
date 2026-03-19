@@ -439,6 +439,40 @@ Returns a single operator-focused plan that combines follow-up urgency with sour
 }
 ```
 
+### GET /api/project-briefs/<briefId>/first-response-draft
+Returns a ready-to-send, URL-aware first response draft for a specific lead so high-intent briefs can be answered in minutes (not hours).
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Behavior:**
+- Pulls the stored brief (`budget`, `timeline`, `summary`, `projectUrl`, `priority`).
+- If `projectUrl` exists, attempts lightweight page signal extraction (`title`, first `h1`, meta description).
+- Generates a structured response draft with 3 observations + recommended next step.
+
+**Response:**
+```json
+{
+  "success": true,
+  "briefId": "7f1ad2c4e92a31b8",
+  "stage": "new",
+  "priority": "high",
+  "draft": {
+    "subject": "Re: your project brief — suggested first sprint",
+    "body": "Hi Jane...",
+    "recommendedNextStep": "Given urgency/fit, I recommend a 20-minute scope call today/tomorrow to lock sprint scope and start this week.",
+    "projectSignals": {
+      "available": true,
+      "title": "Startup — Revenue Ops Platform",
+      "metaDescription": "...",
+      "h1": "Stop leaking pipeline",
+      "url": "https://startup.com"
+    },
+    "summaryPreview": "Need conversion-focused rebuild + analytics..."
+  }
+}
+```
+
 ### POST /send_emails
 Sends emails to recipients.
 

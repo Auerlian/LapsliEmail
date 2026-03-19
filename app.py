@@ -679,6 +679,116 @@ def build_daily_plan(briefs, sla_hours=24):
         'executionNotes': execution_notes
     }
 
+
+def extract_project_url_signals(project_url, timeout=6):
+    """Fetch lightweight public-page signals to personalize first response drafts."""
+    if not project_url:
+        return {'available': False, 'reason': 'project_url_missing'}
+
+    try:
+        req = Request(
+            project_url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (compatible; LapsliEmailLeadOps/1.0; +https://lapslie.com)'
+            }
+        )
+        with urlopen(req, timeout=timeout) as response:
+            content_type = (response.headers.get('Content-Type') or '').lower()
+            if 'text/html' not in content_type:
+                return {'available': False, 'reason': f'unsupported_content_type:{content_type or "unknown"}'}
+            html = response.read(150000).decode('utf-8', errors='ignore')
+
+        title_match = re.search(r'<title[^>]*>(.*?)</title>', html, flags=re.IGNORECASE | re.DOTALL)
+        description_match = re.search(
+            r'<meta[^>]+name=["\']description["\'][^>]+content=["\'](.*?)["\']',
+            html,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+
+        h1_match = re.search(r'<h1[^>]*>(.*?)</h1>', html, flags=re.IGNORECASE | re.DOTALL)
+
+        def clean(value):
+            if not value:
+                return ''
+            without_tags = re.sub(r'<[^>]+>', ' ', value)
+            normalized = re.sub(r'\s+', ' ', without_tags).strip()
+            return normalized[:220]
+
+        signals = {
+            'available': True,
+            'title': clean(title_match.group(1) if title_match else ''),
+            'metaDescription': clean(description_match.group(1) if description_match else ''),
+            'h1': clean(h1_match.group(1) if h1_match else ''),
+            'url': project_url
+        }
+
+        if not any([signals['title'], signals['metaDescription'], signals['h1']]):
+            return {'available': False, 'reason': 'no_extractable_signals', 'url': project_url}
+
+        return signals
+    except Exception as exc:
+        return {'available': False, 'reason': str(exc), 'url': project_url}
+
+
+def build_first_response_draft(brief):
+    """Generate a structured first-response email draft using brief + project URL signals."""
+    name = brief.get('name') or 'there'
+    budget = brief.get('budget') or 'Not specified'
+    timeline = brief.get('timeline') or 'Not specified'
+    priority = brief.get('priority') or 'low'
+    summary = (brief.get('summary') or '').strip()
+    project_url = (brief.get('projectUrl') or '').strip()
+
+    project_signals = extract_project_url_signals(project_url) if project_url else {'available': False, 'reason': 'project_url_missing'}
+
+    observations = []
+    if project_signals.get('available'):
+        if project_signals.get('title'):
+            observations.append(f"Homepage title is currently: \"{project_signals['title']}\".")
+        if project_signals.get('h1'):
+            observations.append(f"Primary page headline appears to be: \"{project_signals['h1']}\".")
+        if project_signals.get('metaDescription'):
+            observations.append("Meta description is present — we can tighten this against your conversion goal so paid/organic clicks land cleaner.")
+        if len(observations) < 3:
+            observations.append("I can run a focused pass on speed, clarity, and CTA path to remove drop-off between first visit and enquiry.")
+    else:
+        observations.append("I can start with a fast conversion + technical audit and map the top 3 fixes with highest expected ROI.")
+
+    while len(observations) < 3:
+        observations.append("I’ll keep changes implementation-first so you get shipped improvements, not just recommendations.")
+
+    recommended_next_step = "Reply with your top KPI + access constraints, and I’ll send a concrete sprint plan within 24 hours."
+    if priority == 'high':
+        recommended_next_step = "Given urgency/fit, I recommend a 20-minute scope call today/tomorrow to lock sprint scope and start this week."
+
+    subject = f"Re: your project brief — suggested first sprint"
+    body_lines = [
+        f"Hi {name},",
+        "",
+        "Thanks for the brief — useful context.",
+        "",
+        "Based on what you shared, here are the first 3 high-leverage opportunities:",
+        f"1) {observations[0]}",
+        f"2) {observations[1]}",
+        f"3) {observations[2]}",
+        "",
+        f"Your stated constraints: budget {budget} · timeline {timeline}.",
+        "",
+        "If useful, I can send a one-page sprint scope with deliverables, timeline, and fixed price range.",
+        recommended_next_step,
+        "",
+        "Best,",
+        "James"
+    ]
+
+    return {
+        'subject': subject,
+        'body': "\n".join(body_lines),
+        'recommendedNextStep': recommended_next_step,
+        'projectSignals': project_signals,
+        'summaryPreview': summary[:320] + ('…' if len(summary) > 320 else '')
+    }
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -1003,6 +1113,41 @@ def get_project_briefs_daily_plan():
         'success': True,
         'limit': limit,
         'plan': plan
+    })
+
+
+@app.route('/api/project-briefs/<brief_id>/first-response-draft', methods=['GET'])
+def get_project_brief_first_response_draft(brief_id):
+    """Return a URL-aware first response draft to accelerate same-day qualification replies."""
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
+
+    briefs = load_all_project_briefs()
+    target_brief = None
+
+    for brief in briefs:
+        candidate_id = brief.get('briefId')
+        if not candidate_id:
+            identity_seed = f"{brief.get('email', 'unknown')}|{brief.get('submittedAt', '')}|{brief.get('name', '')}"
+            candidate_id = compute_hash(identity_seed)
+            brief['briefId'] = candidate_id
+
+        if candidate_id == brief_id:
+            target_brief = brief
+            break
+
+    if not target_brief:
+        return jsonify({'success': False, 'error': 'Brief not found'}), 404
+
+    draft = build_first_response_draft(target_brief)
+
+    return jsonify({
+        'success': True,
+        'briefId': brief_id,
+        'stage': target_brief.get('stage', 'new'),
+        'priority': target_brief.get('priority', 'low'),
+        'draft': draft
     })
 
 
