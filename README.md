@@ -448,15 +448,18 @@ Allocation guidance is sample-aware:
       }
     ],
     "sourceRecommendations": [
-      "SCALE: linkedin — Highest reliable conversion: closeRateFromProposal=50.0%, proposalRateFromTotal=33.33% across 12 leads.",
-      "DEPRIORITIZE: x — Sustained low yield: 0 wins and proposalRateFromTotal=12.5% over 8 leads.",
-      "TEST: referral — Insufficient sample (2 leads). Run a controlled test before scaling or cutting."
+      "SCALE: linkedin — Highest reliable conversion: closeRateFromProposal=50.0%, proposalRateFromTotal=33.33% across 12 leads. Increase this source send volume by ~25% this week.",
+      "DEPRIORITIZE: x — Sustained low yield: 0 wins and proposalRateFromTotal=12.5% over 8 leads. Reduce this source send volume by ~25% this week.",
+      "TEST: referral — Insufficient sample (2 leads). Run a controlled test before scaling or cutting. Run a capped pilot (max 10 sends) and reassess after results."
     ],
     "sourceRecommendationDetails": [
       {
         "action": "scale",
         "source": "linkedin",
-        "reason": "Highest reliable conversion: closeRateFromProposal=50.0%, proposalRateFromTotal=33.33% across 12 leads."
+        "reason": "Highest reliable conversion: closeRateFromProposal=50.0%, proposalRateFromTotal=33.33% across 12 leads.",
+        "allocationShiftPercent": 25,
+        "sendCap": null,
+        "executionRule": "Increase this source send volume by ~25% this week."
       }
     ],
     "executionNotes": [

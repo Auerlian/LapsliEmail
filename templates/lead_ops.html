@@ -147,8 +147,10 @@
         throw new Error(data.error || 'Failed to load queue');
       }
 
-      renderQueue(data.queue || []);
-      statusText.textContent = `Loaded ${data.count || 0} lead(s)`;
+      const followUp = data.followUp || {};
+      const queue = followUp.queue || [];
+      renderQueue(queue);
+      statusText.textContent = `Loaded ${queue.length} lead(s) • ${followUp.overdueLeads || 0} overdue`;
       statusText.className = 'ok';
     }
 
@@ -177,7 +179,11 @@
         return `<code>${escapeHtml(item.briefId || '')}</code> • <strong>${escapeHtml(item.name || 'Unknown')}</strong> (${escapeHtml(item.priority || 'low')}/${escapeHtml(item.stage || 'new')}) — ${action}`;
       });
       renderPlanList('planSourceRecommendations', plan.sourceRecommendationDetails || [], (item) => {
-        return `<strong>${escapeHtml((item.action || 'review').toUpperCase())}</strong> ${escapeHtml(item.source || 'unknown')} — ${escapeHtml(item.reason || '')}`;
+        const shift = Number(item.allocationShiftPercent || 0);
+        const shiftLabel = shift > 0 ? `+${shift}%` : `${shift}%`;
+        const capLabel = item.sendCap ? ` • cap ${item.sendCap} sends` : '';
+        const rule = item.executionRule ? ` • ${escapeHtml(item.executionRule)}` : '';
+        return `<strong>${escapeHtml((item.action || 'review').toUpperCase())}</strong> ${escapeHtml(item.source || 'unknown')} — ${escapeHtml(item.reason || '')} <code>${escapeHtml(shiftLabel)}</code>${escapeHtml(capLabel)}${rule}`;
       });
     }
 

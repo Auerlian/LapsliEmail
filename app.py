@@ -682,7 +682,10 @@ def build_source_recommendations(performance, min_sample=3):
                 f"Highest reliable conversion: closeRateFromProposal={winner.get('closeRateFromProposal', 0)}%, "
                 f"proposalRateFromTotal={winner.get('proposalRateFromTotal', 0)}% "
                 f"across {winner.get('total', 0)} leads."
-            )
+            ),
+            'allocationShiftPercent': 25,
+            'sendCap': None,
+            'executionRule': 'Increase this source send volume by ~25% this week.'
         })
 
     weak_reliable = [
@@ -697,7 +700,10 @@ def build_source_recommendations(performance, min_sample=3):
             'reason': (
                 f"Sustained low yield: 0 wins and proposalRateFromTotal={weakest.get('proposalRateFromTotal', 0)}% "
                 f"over {weakest.get('total', 0)} leads."
-            )
+            ),
+            'allocationShiftPercent': -25,
+            'sendCap': None,
+            'executionRule': 'Reduce this source send volume by ~25% this week.'
         })
 
     low_data = [item for item in items if item.get('total', 0) < min_sample]
@@ -713,7 +719,10 @@ def build_source_recommendations(performance, min_sample=3):
             'reason': (
                 f"Insufficient sample ({test_candidate.get('total', 0)} leads). "
                 "Run a controlled test before scaling or cutting."
-            )
+            ),
+            'allocationShiftPercent': 0,
+            'sendCap': 10,
+            'executionRule': 'Run a capped pilot (max 10 sends) and reassess after results.'
         })
 
     return recommendations
@@ -739,7 +748,10 @@ def build_daily_plan(briefs, sla_hours=24):
 
     source_recommendation_objects = build_source_recommendations(performance)
     source_recommendations = [
-        f"{entry.get('action', 'review').upper()}: {entry.get('source', 'unknown')} — {entry.get('reason', '')}"
+        (
+            f"{entry.get('action', 'review').upper()}: {entry.get('source', 'unknown')} — "
+            f"{entry.get('reason', '')} {entry.get('executionRule', '')}".strip()
+        )
         for entry in source_recommendation_objects
     ]
 
