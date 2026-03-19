@@ -165,7 +165,7 @@ Validates and cleans recipient list.
 ```
 
 ### POST /api/project-brief
-Captures freelance leads from Lapslie.com and logs them to `data/project_briefs.jsonl`.
+Captures freelance leads from Lapslie.com, scores priority, logs them to `data/project_briefs.jsonl`, and can send instant emails.
 
 **Request:**
 ```json
@@ -185,20 +185,56 @@ Captures freelance leads from Lapslie.com and logs them to `data/project_briefs.
 {
   "success": true,
   "message": "Project brief received",
+  "priority": "high",
+  "leadScore": 11,
   "notification": {
-    "sent": false,
-    "reason": "lead_smtp_not_configured"
+    "sent": true
+  },
+  "acknowledgement": {
+    "sent": true
   }
 }
 ```
 
-Optional email notification env vars:
+Optional lead-system env vars:
 - `LEAD_SMTP_SERVER`
 - `LEAD_SMTP_PORT` (default `587`)
 - `LEAD_SMTP_USER`
 - `LEAD_SMTP_PASS`
 - `LEAD_FROM_EMAIL`
 - `LEAD_TO_EMAIL` (default `james@lapslie.com`)
+- `LEAD_ACK_ENABLED` (default `true`)
+- `LEAD_CALENDLY_URL` (default `https://calendly.com/lapslie/30min`)
+- `LEAD_DASHBOARD_TOKEN` (required for secure lead inbox endpoint)
+
+### GET /api/project-briefs
+Returns recent project briefs for lightweight CRM/inbox use.
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Query params:**
+- `limit` (1-100, default 25)
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 2,
+  "briefs": [
+    {
+      "name": "Jane Founder",
+      "email": "jane@startup.com",
+      "budget": "£5,000–£10,000",
+      "timeline": "Within 2 weeks",
+      "summary": "Need landing page + analytics sprint",
+      "priority": "high",
+      "leadScore": 10,
+      "submittedAt": "2026-03-19T00:00:00+00:00"
+    }
+  ]
+}
+```
 
 ### POST /send_emails
 Sends emails to recipients.

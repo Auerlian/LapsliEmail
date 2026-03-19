@@ -29,6 +29,9 @@ LEAD_SMTP_USER = os.environ.get('LEAD_SMTP_USER')
 LEAD_SMTP_PASS = os.environ.get('LEAD_SMTP_PASS')
 LEAD_FROM_EMAIL = os.environ.get('LEAD_FROM_EMAIL', LEAD_SMTP_USER or '')
 LEAD_TO_EMAIL = os.environ.get('LEAD_TO_EMAIL', 'james@lapslie.com')
+LEAD_ACK_ENABLED = os.environ.get('LEAD_ACK_ENABLED', 'true').lower() in ('1', 'true', 'yes', 'on')
+LEAD_CALENDLY_URL = os.environ.get('LEAD_CALENDLY_URL', 'https://calendly.com/lapslie/30min')
+LEAD_DASHBOARD_TOKEN = os.environ.get('LEAD_DASHBOARD_TOKEN', '')
 
 class HTMLToText(HTMLParser):
     """Simple HTML to text converter for fallback"""
@@ -174,18 +177,78 @@ def append_project_brief_log(payload):
         f.write(json.dumps(payload, ensure_ascii=False) + '\n')
 
 
-def notify_project_brief_via_email(payload):
-    """Send project brief notification if LEAD SMTP env vars are configured."""
-    if not all([LEAD_SMTP_SERVER, LEAD_SMTP_PORT, LEAD_SMTP_USER, LEAD_SMTP_PASS, LEAD_FROM_EMAIL, LEAD_TO_EMAIL]):
+def send_email_via_lead_smtp(recipient, subject, body):
+    """Shared SMTP sender for lead notifications and acknowledgements."""
+    if not all([LEAD_SMTP_SERVER, LEAD_SMTP_PORT, LEAD_SMTP_USER, LEAD_SMTP_PASS, LEAD_FROM_EMAIL]):
         return {'sent': False, 'reason': 'lead_smtp_not_configured'}
 
-    subject = f"[Lapslie.com Lead] {payload['name']} — {payload['budget']}"
+    msg = MIMEText(body, 'plain', 'utf-8')
+    msg['From'] = LEAD_FROM_EMAIL
+    msg['To'] = recipient
+    msg['Subject'] = subject
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP(LEAD_SMTP_SERVER, LEAD_SMTP_PORT) as server:
+        server.starttls(context=context)
+        server.login(LEAD_SMTP_USER, LEAD_SMTP_PASS)
+        server.sendmail(LEAD_FROM_EMAIL, recipient, msg.as_string())
+
+    return {'sent': True}
+
+
+def score_project_brief(payload):
+    """Simple fit score to prioritize follow-up response queue."""
+    score = 0
+
+    budget_weights = {
+        '£10,000+': 5,
+        '£5,000–£10,000': 4,
+        '£2,500–£5,000': 3,
+        '£1,000–£2,500': 2,
+        'Under £1,000': 1,
+        'Not sure yet': 1
+    }
+    timeline_weights = {
+        'ASAP (this week)': 5,
+        'Within 2 weeks': 4,
+        'Within 1 month': 3,
+        'Within 2–3 months': 2,
+        'Exploring options': 1,
+        'Not sure yet': 1
+    }
+
+    score += budget_weights.get(payload.get('budget', ''), 1)
+    score += timeline_weights.get(payload.get('timeline', ''), 1)
+
+    summary = payload.get('summary', '')
+    if len(summary) >= 180:
+        score += 2
+    elif len(summary) >= 80:
+        score += 1
+
+    if score >= 10:
+        priority = 'high'
+    elif score >= 7:
+        priority = 'medium'
+    else:
+        priority = 'low'
+
+    return {'score': score, 'priority': priority}
+
+
+def notify_project_brief_via_email(payload):
+    """Send internal project brief notification if LEAD SMTP env vars are configured."""
+    if not LEAD_TO_EMAIL:
+        return {'sent': False, 'reason': 'lead_to_email_not_configured'}
+
+    subject = f"[Lapslie.com Lead] ({payload['priority'].upper()}) {payload['name']} — {payload['budget']}"
     body = f"""New project brief submitted via Lapslie.com
 
 Name: {payload['name']}
 Email: {payload['email']}
 Budget: {payload['budget']}
 Timeline: {payload['timeline']}
+Lead Score: {payload['leadScore']} ({payload['priority']})
 Submitted At: {payload['submittedAt']}
 Source: {payload['source']}
 
@@ -193,18 +256,52 @@ Summary:
 {payload['summary']}
 """
 
-    msg = MIMEText(body, 'plain', 'utf-8')
-    msg['From'] = LEAD_FROM_EMAIL
-    msg['To'] = LEAD_TO_EMAIL
-    msg['Subject'] = subject
+    return send_email_via_lead_smtp(LEAD_TO_EMAIL, subject, body)
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP(LEAD_SMTP_SERVER, LEAD_SMTP_PORT) as server:
-        server.starttls(context=context)
-        server.login(LEAD_SMTP_USER, LEAD_SMTP_PASS)
-        server.sendmail(LEAD_FROM_EMAIL, LEAD_TO_EMAIL, msg.as_string())
 
-    return {'sent': True}
+def send_project_brief_acknowledgement(payload):
+    """Send immediate acknowledgement to the lead to improve conversion and trust."""
+    if not LEAD_ACK_ENABLED:
+        return {'sent': False, 'reason': 'lead_ack_disabled'}
+
+    subject = "Got it — your project brief is in"
+    body = f"""Hi {payload['name']},
+
+Thanks for sending your project brief — I received it.
+
+What happens next:
+1) I review your goals, constraints, and timeline.
+2) You get a direct reply with recommended next steps within 24 hours.
+3) If a call would accelerate things, you can book here: {LEAD_CALENDLY_URL}
+
+Quick recap from your brief:
+- Budget: {payload['budget']}
+- Timeline: {payload['timeline']}
+
+Speak soon,
+James
+"""
+
+    return send_email_via_lead_smtp(payload['email'], subject, body)
+
+
+def load_recent_project_briefs(limit=25):
+    """Load most recent project briefs from JSONL log."""
+    if not os.path.exists(PROJECT_BRIEF_LOG_PATH):
+        return []
+
+    briefs = []
+    with open(PROJECT_BRIEF_LOG_PATH, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                briefs.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    return list(reversed(briefs[-limit:]))
 
 @app.route('/')
 def index():
@@ -323,16 +420,46 @@ def project_brief():
         'ipHash': compute_hash(request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown'))
     }
 
+    lead_priority = score_project_brief(payload)
+    payload['leadScore'] = lead_priority['score']
+    payload['priority'] = lead_priority['priority']
+
     try:
         append_project_brief_log(payload)
         notify_result = notify_project_brief_via_email(payload)
+        acknowledgement_result = send_project_brief_acknowledgement(payload)
         return jsonify({
             'success': True,
             'message': 'Project brief received',
-            'notification': notify_result
+            'priority': payload['priority'],
+            'leadScore': payload['leadScore'],
+            'notification': notify_result,
+            'acknowledgement': acknowledgement_result
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/project-briefs', methods=['GET'])
+def get_project_briefs():
+    """Lightweight lead inbox endpoint for quick qualification and follow-up."""
+    if not LEAD_DASHBOARD_TOKEN:
+        return jsonify({'success': False, 'error': 'Dashboard token not configured'}), 403
+
+    auth_header = request.headers.get('Authorization', '')
+    expected_auth = f"Bearer {LEAD_DASHBOARD_TOKEN}"
+    if auth_header != expected_auth:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    limit = request.args.get('limit', default=25, type=int)
+    limit = max(1, min(limit, 100))
+
+    briefs = load_recent_project_briefs(limit=limit)
+    return jsonify({
+        'success': True,
+        'count': len(briefs),
+        'briefs': briefs
+    })
 
 
 @app.route('/send_emails', methods=['POST'])
