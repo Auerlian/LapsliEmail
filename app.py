@@ -563,6 +563,27 @@ def parse_iso_datetime(value):
         return None
 
 
+def apply_stage_update(brief, requested_stage, status_notes=''):
+    """Apply stage transition metadata consistently across endpoints."""
+    previous_stage = brief.get('stage', 'new')
+    brief['stage'] = requested_stage
+    now_iso = datetime.now(timezone.utc).isoformat()
+    brief['stageUpdatedAt'] = now_iso
+
+    if status_notes:
+        brief['statusNotes'] = status_notes[:800]
+
+    if requested_stage in {'contacted', 'qualified', 'proposal_sent', 'won', 'lost'} and not brief.get('contactedAt'):
+        brief['contactedAt'] = now_iso
+        submitted_at = parse_iso_datetime(brief.get('submittedAt'))
+        contacted_at = parse_iso_datetime(now_iso)
+        if submitted_at and contacted_at:
+            first_response_hours = max(0.0, (contacted_at - submitted_at).total_seconds() / 3600.0)
+            brief['firstResponseHours'] = round(first_response_hours, 2)
+
+    return previous_stage, now_iso
+
+
 def build_follow_up_queue(briefs, sla_hours=24):
     """Return open leads sorted by urgency against a follow-up SLA."""
     now = datetime.now(timezone.utc)
@@ -1056,21 +1077,7 @@ def update_project_brief(brief_id):
             brief['briefId'] = candidate_id
 
         if candidate_id == brief_id:
-            previous_stage = brief.get('stage', 'new')
-            brief['stage'] = requested_stage
-            now_iso = datetime.now(timezone.utc).isoformat()
-            brief['stageUpdatedAt'] = now_iso
-            if status_notes:
-                brief['statusNotes'] = status_notes
-
-            if requested_stage in {'contacted', 'qualified', 'proposal_sent', 'won', 'lost'} and not brief.get('contactedAt'):
-                brief['contactedAt'] = now_iso
-                submitted_at = parse_iso_datetime(brief.get('submittedAt'))
-                contacted_at = parse_iso_datetime(now_iso)
-                if submitted_at and contacted_at:
-                    first_response_hours = max(0.0, (contacted_at - submitted_at).total_seconds() / 3600.0)
-                    brief['firstResponseHours'] = round(first_response_hours, 2)
-
+            previous_stage, _ = apply_stage_update(brief, requested_stage, status_notes=status_notes)
             updated_brief = brief
             break
 
@@ -1209,6 +1216,78 @@ def get_project_brief_first_response_draft(brief_id):
         'stage': target_brief.get('stage', 'new'),
         'priority': target_brief.get('priority', 'low'),
         'draft': draft
+    })
+
+
+@app.route('/api/project-briefs/<brief_id>/first-response-send', methods=['POST'])
+def send_project_brief_first_response(brief_id):
+    """Send first response via lead SMTP and optionally mark lead as contacted."""
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
+
+    briefs = load_all_project_briefs()
+    target_brief = None
+
+    for brief in briefs:
+        candidate_id = brief.get('briefId')
+        if not candidate_id:
+            identity_seed = f"{brief.get('email', 'unknown')}|{brief.get('submittedAt', '')}|{brief.get('name', '')}"
+            candidate_id = compute_hash(identity_seed)
+            brief['briefId'] = candidate_id
+
+        if candidate_id == brief_id:
+            target_brief = brief
+            break
+
+    if not target_brief:
+        return jsonify({'success': False, 'error': 'Brief not found'}), 404
+
+    recipient = (target_brief.get('email') or '').strip()
+    if not recipient:
+        return jsonify({'success': False, 'error': 'Brief has no recipient email'}), 400
+
+    data = request.json or {}
+    draft = build_first_response_draft(target_brief)
+    subject = str(data.get('subject') or draft.get('subject') or '').strip()
+    body = str(data.get('body') or draft.get('body') or '').strip()
+
+    if not subject or not body:
+        return jsonify({'success': False, 'error': 'Unable to send: missing subject or body'}), 400
+
+    send_result = send_email_via_lead_smtp(recipient, subject, body)
+    if not send_result.get('sent'):
+        return jsonify({
+            'success': False,
+            'error': 'Failed to send first response',
+            'email': send_result
+        }), 503
+
+    mark_contacted = data.get('markContacted', True)
+    stage_updated = False
+    previous_stage = target_brief.get('stage', 'new')
+
+    if mark_contacted and previous_stage == 'new':
+        status_notes = str(data.get('statusNotes', '')).strip()
+        default_note = f"First response sent via API at {datetime.now(timezone.utc).isoformat()}"
+        combined_notes = f"{default_note}. {status_notes}".strip() if status_notes else default_note
+        apply_stage_update(target_brief, 'contacted', status_notes=combined_notes)
+        stage_updated = True
+
+    if stage_updated:
+        save_all_project_briefs(briefs)
+
+    return jsonify({
+        'success': True,
+        'briefId': brief_id,
+        'email': send_result,
+        'stage': target_brief.get('stage', 'new'),
+        'stageUpdated': stage_updated,
+        'previousStage': previous_stage,
+        'draftUsed': {
+            'subject': subject,
+            'recommendedNextStep': draft.get('recommendedNextStep', '')
+        }
     })
 
 

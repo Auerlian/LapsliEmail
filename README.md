@@ -486,6 +486,45 @@ Returns a ready-to-send, URL-aware first response draft for a specific lead so h
 }
 ```
 
+### POST /api/project-briefs/<briefId>/first-response-send
+Sends a first-response email directly to the lead using configured `LEAD_SMTP_*` settings, with optional overrides to the generated subject/body.
+
+This lets the operator go from queue -> draft -> sent reply in one API flow.
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Request (optional fields):**
+```json
+{
+  "subject": "Optional override subject",
+  "body": "Optional override body",
+  "markContacted": true,
+  "statusNotes": "Sent first response + asked for analytics access"
+}
+```
+
+**Behavior:**
+- Uses generated draft if `subject` and/or `body` are not provided.
+- Sends to the brief's stored `email` via lead SMTP.
+- If `markContacted=true` (default) and current stage is `new`, automatically moves lead to `contacted` and writes a timestamped status note.
+
+**Response:**
+```json
+{
+  "success": true,
+  "briefId": "7f1ad2c4e92a31b8",
+  "email": {"sent": true},
+  "stage": "contacted",
+  "stageUpdated": true,
+  "previousStage": "new",
+  "draftUsed": {
+    "subject": "Re: your project brief — suggested first sprint",
+    "recommendedNextStep": "Given urgency/fit, I recommend a 20-minute scope call today/tomorrow to lock sprint scope and start this week."
+  }
+}
+```
+
 ### POST /send_emails
 Sends emails to recipients.
 
