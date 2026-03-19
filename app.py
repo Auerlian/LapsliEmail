@@ -875,6 +875,12 @@ def build_first_response_draft(brief):
 def index():
     return render_template('index.html')
 
+
+@app.route('/lead-ops', methods=['GET'])
+def lead_ops_console():
+    """Simple browser console for daily lead follow-up actions."""
+    return render_template('lead_ops.html')
+
 @app.route('/load_template', methods=['GET'])
 def load_template():
     """Load the email template from static/email.html"""

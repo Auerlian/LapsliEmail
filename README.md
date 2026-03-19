@@ -142,6 +142,18 @@ Check that:
 - Store send logs
 - Handle bounces
 
+## Lead Ops Console
+
+Open `/lead-ops` in the browser for a lightweight daily operator console that connects directly to lead APIs.
+
+What it supports:
+- Pulls `GET /api/project-briefs/follow-up-queue` with configurable SLA window.
+- One-click first-response execution via `POST /api/project-briefs/<briefId>/first-response-send`.
+- Stage updates via `PATCH /api/project-briefs/<briefId>`.
+- On-demand draft preview via `GET /api/project-briefs/<briefId>/first-response-draft`.
+
+The page asks for `LEAD_DASHBOARD_TOKEN` client-side and sends Bearer auth on each API call.
+
 ## API Endpoints
 
 ### POST /validate_recipients

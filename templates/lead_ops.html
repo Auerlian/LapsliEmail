@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lead Ops Console</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #111a2e;
+      --muted: #97a3c2;
+      --text: #e9eefc;
+      --ok: #29c36a;
+      --warn: #efb738;
+      --bad: #ea5a5a;
+      --line: #233153;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 20px;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .controls { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; }
+    input, select, textarea, button {
+      background: #0d1528;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 14px;
+    }
+    textarea { width: 100%; min-height: 78px; }
+    button { cursor: pointer; }
+    button:hover { border-color: #3c5291; }
+    .pill { padding: 3px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+    .high { color: #ffd2d2; border-color: #5f2c2c; background: #2a1515; }
+    .medium { color: #ffe9b8; border-color: #5f4f2c; background: #2a2215; }
+    .low { color: #cfe9ff; border-color: #2c4b5f; background: #15212a; }
+    .grid { display: grid; gap: 12px; }
+    .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: #0c1529; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Lead Ops Console</h1>
+    <p>Daily action view for fast follow-up. Pull queue, send first response, and stage-update in one place.</p>
+
+    <div class="panel controls">
+      <input id="token" type="password" placeholder="LEAD_DASHBOARD_TOKEN" />
+      <input id="slaHours" type="number" min="1" max="168" value="24" title="SLA hours" />
+      <input id="limit" type="number" min="1" max="100" value="25" title="Queue size" />
+      <button id="refreshBtn">Refresh Queue</button>
+    </div>
+
+    <div class="panel">
+      <strong>Queue status: </strong><span id="statusText" class="warn">Not loaded</span>
+      <div id="queue" class="grid" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <script>
+    const statusText = document.getElementById('statusText');
+    const queueEl = document.getElementById('queue');
+
+    function authHeaders() {
+      const token = document.getElementById('token').value.trim();
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+    }
+
+    function priorityClass(priority) {
+      if (priority === 'high') return 'high';
+      if (priority === 'medium') return 'medium';
+      return 'low';
+    }
+
+    async function fetchQueue() {
+      const slaHours = Number(document.getElementById('slaHours').value || 24);
+      const limit = Number(document.getElementById('limit').value || 25);
+      statusText.textContent = 'Loading...';
+      statusText.className = 'warn';
+
+      const res = await fetch(`/api/project-briefs/follow-up-queue?slaHours=${slaHours}&limit=${limit}`, {
+        headers: authHeaders()
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to load queue');
+      }
+
+      renderQueue(data.queue || []);
+      statusText.textContent = `Loaded ${data.count || 0} lead(s)`;
+      statusText.className = 'ok';
+    }
+
+    function renderQueue(items) {
+      queueEl.innerHTML = '';
+
+      if (!items.length) {
+        queueEl.innerHTML = '<div class="card"><span class="ok">No leads currently in follow-up queue.</span></div>';
+        return;
+      }
+
+      for (const lead of items) {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;">
+            <strong>${escapeHtml(lead.name || 'Unknown')}</strong>
+            <span class="pill ${priorityClass(lead.priority)}">${escapeHtml((lead.priority || 'low').toUpperCase())}</span>
+          </div>
+          <div class="meta">
+            <span>${escapeHtml(lead.email || '')}</span>
+            <span>• Stage: <strong>${escapeHtml(lead.stage || 'new')}</strong></span>
+            <span>• Source: ${escapeHtml(lead.utmSource || lead.source || 'unknown')}</span>
+            <span>• SLA: ${lead.overdue ? 'Overdue' : 'In window'}</span>
+          </div>
+          <div>${escapeHtml(lead.summary || '')}</div>
+          <textarea data-note="${lead.briefId}" placeholder="Status note (optional)"></textarea>
+          <div class="actions">
+            <button data-action="draft" data-id="${lead.briefId}">Load draft</button>
+            <button data-action="send" data-id="${lead.briefId}">Send first response</button>
+            <button data-action="contacted" data-id="${lead.briefId}">Mark contacted</button>
+            <button data-action="qualified" data-id="${lead.briefId}">Mark qualified</button>
+            <button data-action="proposal_sent" data-id="${lead.briefId}">Mark proposal_sent</button>
+          </div>
+          <pre id="out-${lead.briefId}" style="white-space:pre-wrap;color:#b9c8f3;margin-top:10px;"></pre>
+        `;
+
+        queueEl.appendChild(card);
+      }
+    }
+
+    async function patchStage(briefId, stage) {
+      const note = document.querySelector(`textarea[data-note="${briefId}"]`)?.value || '';
+      const res = await fetch(`/api/project-briefs/${briefId}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ stage, statusNotes: note })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Stage update failed');
+      return data;
+    }
+
+    async function loadDraft(briefId) {
+      const res = await fetch(`/api/project-briefs/${briefId}/first-response-draft`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Draft generation failed');
+      return data;
+    }
+
+    async function sendFirstResponse(briefId) {
+      const note = document.querySelector(`textarea[data-note="${briefId}"]`)?.value || '';
+      const res = await fetch(`/api/project-briefs/${briefId}/first-response-send`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ autoMarkContacted: true, statusNotes: note })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Send failed');
+      return data;
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    queueEl.addEventListener('click', async (event) => {
+      const btn = event.target.closest('button[data-action]');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      const briefId = btn.dataset.id;
+      const output = document.getElementById(`out-${briefId}`);
+
+      btn.disabled = true;
+      output.textContent = 'Working...';
+
+      try {
+        let result;
+        if (action === 'draft') {
+          result = await loadDraft(briefId);
+          output.textContent = `Subject: ${result.draft?.subject || ''}\n\n${result.draft?.body || ''}`;
+        } else if (action === 'send') {
+          result = await sendFirstResponse(briefId);
+          output.textContent = `Sent: ${JSON.stringify(result.sendResult || {}, null, 2)}\nStage: ${result.stage || ''}`;
+          await fetchQueue();
+        } else {
+          result = await patchStage(briefId, action);
+          output.textContent = `Updated to ${result.brief?.stage || action}`;
+          await fetchQueue();
+        }
+      } catch (err) {
+        output.textContent = `Error: ${err.message}`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', async () => {
+      try {
+        await fetchQueue();
+      } catch (err) {
+        statusText.textContent = err.message;
+        statusText.className = 'bad';
+      }
+    });
+  </script>
+</body>
+</html>
