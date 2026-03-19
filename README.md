@@ -401,6 +401,11 @@ Returns open leads ranked by urgency so you can enforce a response SLA and focus
 ### GET /api/project-briefs/daily-plan
 Returns a single operator-focused plan that combines follow-up urgency with source allocation guidance.
 
+Allocation guidance is sample-aware:
+- `scale`: reliable channels with enough volume + proposal history
+- `deprioritize`: reliable channels with sustained low conversion
+- `test`: low-sample channels that need controlled experiments before budget/time shifts
+
 **Auth:**
 `Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
 
@@ -429,8 +434,16 @@ Returns a single operator-focused plan that combines follow-up urgency with sour
       }
     ],
     "sourceRecommendations": [
-      "Double down on linkedin (won=2, proposalSent=4).",
-      "Reduce low-yield effort on x until conversion proof improves."
+      "SCALE: linkedin — Highest reliable conversion: closeRateFromProposal=50.0%, proposalRateFromTotal=33.33% across 12 leads.",
+      "DEPRIORITIZE: x — Sustained low yield: 0 wins and proposalRateFromTotal=12.5% over 8 leads.",
+      "TEST: referral — Insufficient sample (2 leads). Run a controlled test before scaling or cutting."
+    ],
+    "sourceRecommendationDetails": [
+      {
+        "action": "scale",
+        "source": "linkedin",
+        "reason": "Highest reliable conversion: closeRateFromProposal=50.0%, proposalRateFromTotal=33.33% across 12 leads."
+      }
     ],
     "executionNotes": [
       "Clear overdue queue first: 3 leads beyond 24h SLA."

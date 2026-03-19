@@ -631,6 +631,73 @@ def build_follow_up_queue(briefs, sla_hours=24):
     }
 
 
+def build_source_recommendations(performance, min_sample=3):
+    """Create sample-aware channel allocation guidance from source performance metrics."""
+    recommendations = []
+    items = [item for item in performance if item.get('total', 0) > 0]
+    if not items:
+        return recommendations
+
+    reliable = [
+        item for item in items
+        if item.get('total', 0) >= min_sample and item.get('proposalSent', 0) >= 1
+    ]
+
+    reliable.sort(
+        key=lambda item: (
+            item.get('closeRateFromProposal', 0),
+            item.get('proposalRateFromTotal', 0),
+            item.get('won', 0)
+        ),
+        reverse=True
+    )
+
+    if reliable:
+        winner = reliable[0]
+        recommendations.append({
+            'action': 'scale',
+            'source': winner.get('source', 'unknown'),
+            'reason': (
+                f"Highest reliable conversion: closeRateFromProposal={winner.get('closeRateFromProposal', 0)}%, "
+                f"proposalRateFromTotal={winner.get('proposalRateFromTotal', 0)}% "
+                f"across {winner.get('total', 0)} leads."
+            )
+        })
+
+    weak_reliable = [
+        item for item in reliable
+        if item.get('won', 0) == 0 and item.get('proposalRateFromTotal', 0) < 20
+    ]
+    if weak_reliable:
+        weakest = sorted(weak_reliable, key=lambda item: item.get('total', 0), reverse=True)[0]
+        recommendations.append({
+            'action': 'deprioritize',
+            'source': weakest.get('source', 'unknown'),
+            'reason': (
+                f"Sustained low yield: 0 wins and proposalRateFromTotal={weakest.get('proposalRateFromTotal', 0)}% "
+                f"over {weakest.get('total', 0)} leads."
+            )
+        })
+
+    low_data = [item for item in items if item.get('total', 0) < min_sample]
+    if low_data:
+        test_candidate = sorted(
+            low_data,
+            key=lambda item: (item.get('proposalRateFromTotal', 0), item.get('total', 0)),
+            reverse=True
+        )[0]
+        recommendations.append({
+            'action': 'test',
+            'source': test_candidate.get('source', 'unknown'),
+            'reason': (
+                f"Insufficient sample ({test_candidate.get('total', 0)} leads). "
+                "Run a controlled test before scaling or cutting."
+            )
+        })
+
+    return recommendations
+
+
 def build_daily_plan(briefs, sla_hours=24):
     """Combine queue urgency + source performance into a focused daily execution plan."""
     follow_up = build_follow_up_queue(briefs, sla_hours=sla_hours)
@@ -649,18 +716,11 @@ def build_daily_plan(briefs, sla_hours=24):
             'recommendedAction': item.get('recommendedAction', 'Follow up with next concrete step')
         })
 
-    strongest_source = performance[0] if performance else None
-    weakest_source = performance[-1] if performance else None
-
-    source_recommendations = []
-    if strongest_source:
-        source_recommendations.append(
-            f"Double down on {strongest_source.get('source', 'unknown')} (won={strongest_source.get('won', 0)}, proposalSent={strongest_source.get('proposalSent', 0)})."
-        )
-    if weakest_source and weakest_source.get('source') != strongest_source.get('source'):
-        source_recommendations.append(
-            f"Reduce low-yield effort on {weakest_source.get('source', 'unknown')} until conversion proof improves."
-        )
+    source_recommendation_objects = build_source_recommendations(performance)
+    source_recommendations = [
+        f"{entry.get('action', 'review').upper()}: {entry.get('source', 'unknown')} — {entry.get('reason', '')}"
+        for entry in source_recommendation_objects
+    ]
 
     execution_notes = []
     if follow_up.get('overdueLeads', 0) > 0:
@@ -676,6 +736,7 @@ def build_daily_plan(briefs, sla_hours=24):
         'overdueLeads': follow_up.get('overdueLeads', 0),
         'topActions': top_actions,
         'sourceRecommendations': source_recommendations,
+        'sourceRecommendationDetails': source_recommendation_objects,
         'executionNotes': execution_notes
     }
 
