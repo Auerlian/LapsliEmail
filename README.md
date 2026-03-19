@@ -174,8 +174,9 @@ Captures freelance leads from Lapslie.com, scores priority, logs them to `data/p
   "email": "jane@startup.com",
   "budget": "£2,500–£5,000",
   "timeline": "Within 1 month",
+  "projectUrl": "https://startup.com",
   "summary": "Need conversion-focused rebuild + analytics",
-  "website": "",
+  "website": "", 
   "source": "lapslie.com",
   "utmSource": "linkedin",
   "utmMedium": "dm",
@@ -222,8 +223,10 @@ Optional lead-system env vars:
 - `LEAD_ALERT_WEBHOOK_URL` (optional webhook for instant lead/stage alerts)
 - `LEAD_ALERT_MIN_PRIORITY` (`low|medium|high`, default `high`)
 
+`projectUrl` is optional but recommended for faster qualification.
+
 When `LEAD_ALERT_WEBHOOK_URL` is set, new leads above the configured threshold trigger a webhook POST with:
-`eventType`, `briefId`, `name`, `email`, `priority`, `stage`, `source`, `budget`, `timeline`, `leadScore`, timestamps, and a summary preview.
+`eventType`, `briefId`, `name`, `email`, `priority`, `stage`, `source`, `budget`, `timeline`, `projectUrl`, `leadScore`, timestamps, and a summary preview.
 
 ### GET /api/project-briefs
 Returns recent project briefs for lightweight CRM/inbox use.
@@ -246,6 +249,7 @@ Returns recent project briefs for lightweight CRM/inbox use.
       "email": "jane@startup.com",
       "budget": "£5,000–£10,000",
       "timeline": "Within 2 weeks",
+      "projectUrl": "https://startup.com",
       "summary": "Need landing page + analytics sprint",
       "priority": "high",
       "leadScore": 10,

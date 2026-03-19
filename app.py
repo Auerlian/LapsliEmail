@@ -261,6 +261,7 @@ def send_lead_alert(event_type, payload):
         'source': source,
         'budget': payload.get('budget'),
         'timeline': payload.get('timeline'),
+        'projectUrl': payload.get('projectUrl'),
         'leadScore': payload.get('leadScore'),
         'stageUpdatedAt': payload.get('stageUpdatedAt') or payload.get('submittedAt'),
         'submittedAt': payload.get('submittedAt'),
@@ -311,6 +312,10 @@ def score_project_brief(payload):
     elif len(summary) >= 80:
         score += 1
 
+    project_url = str(payload.get('projectUrl', '')).strip()
+    if project_url.startswith('http://') or project_url.startswith('https://'):
+        score += 1
+
     if score >= 10:
         priority = 'high'
     elif score >= 7:
@@ -333,6 +338,7 @@ Name: {payload['name']}
 Email: {payload['email']}
 Budget: {payload['budget']}
 Timeline: {payload['timeline']}
+Project URL: {payload.get('projectUrl') or 'Not provided'}
 Lead Score: {payload['leadScore']} ({payload['priority']})
 Submitted At: {payload['submittedAt']}
 Source: {payload['source']}
@@ -362,6 +368,7 @@ What happens next:
 Quick recap from your brief:
 - Budget: {payload['budget']}
 - Timeline: {payload['timeline']}
+- Project URL: {payload.get('projectUrl') or 'Not provided'}
 
 Speak soon,
 James
@@ -777,12 +784,17 @@ def project_brief():
     if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
         return jsonify({'success': False, 'error': 'Invalid email format'}), 400
 
+    project_url = str(data.get('projectUrl', '')).strip()
+    if project_url and not re.match(r'^https?://[^\s]+$', project_url, re.IGNORECASE):
+        return jsonify({'success': False, 'error': 'Invalid projectUrl format. Use full URL including http(s)://'}), 400
+
     submitted_at = datetime.now(timezone.utc).isoformat()
     payload = {
         'name': str(data.get('name', '')).strip(),
         'email': email,
         'budget': str(data.get('budget', '')).strip(),
         'timeline': str(data.get('timeline', '')).strip(),
+        'projectUrl': project_url[:300],
         'summary': str(data.get('summary', '')).strip(),
         'source': str(data.get('source', 'lapslie.com')).strip(),
         'utmSource': str(data.get('utmSource', '')).strip()[:120],
