@@ -271,6 +271,10 @@ Allowed `stage` values:
 - `won`
 - `lost`
 
+When a lead is first moved into any follow-up stage (`contacted`, `qualified`, `proposal_sent`, `won`, `lost`), the API also stores:
+- `contactedAt`
+- `firstResponseHours` (hours between `submittedAt` and first contact)
+
 ### GET /api/project-briefs/summary
 Returns a quick attribution + quality + pipeline summary so you can see which channels are generating high-priority leads and whether they are converting.
 
@@ -296,8 +300,49 @@ Returns a quick attribution + quality + pipeline summary so you can see which ch
       "proposal_sent": 2,
       "won": 1,
       "lost": 0
+    },
+    "responseSLA": {
+      "contactedLeads": 7,
+      "respondedWithin24h": 5,
+      "respondedWithin24hRate": 71.43,
+      "avgFirstResponseHours": 18.6
     }
   }
+}
+```
+
+### GET /api/project-briefs/source-performance
+Returns per-channel performance so outreach can be reallocated toward sources that produce proposals and wins (not just raw lead volume).
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Query params:**
+- `limit` (1-1000, default 200)
+
+**Response:**
+```json
+{
+  "success": true,
+  "limit": 200,
+  "performance": [
+    {
+      "source": "linkedin",
+      "total": 12,
+      "highPriority": 5,
+      "contacted": 8,
+      "qualified": 6,
+      "proposalSent": 4,
+      "won": 2,
+      "lost": 1,
+      "winRateFromTotal": 16.67,
+      "proposalRateFromTotal": 33.33,
+      "closeRateFromProposal": 50.0,
+      "respondedWithin24h": 6,
+      "responseWithin24hRate": 75.0,
+      "avgFirstResponseHours": 14.2
+    }
+  ]
 }
 ```
 

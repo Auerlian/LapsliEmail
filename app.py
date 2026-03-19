@@ -340,6 +340,10 @@ def summarize_project_briefs(briefs):
     by_source = {}
     by_stage = {stage: 0 for stage in sorted(LEAD_STAGES)}
 
+    contacted_count = 0
+    responded_within_24h = 0
+    first_response_hours_values = []
+
     for brief in briefs:
         priority = brief.get('priority', 'low')
         if priority not in by_priority:
@@ -354,12 +358,122 @@ def summarize_project_briefs(briefs):
             by_stage[stage] = 0
         by_stage[stage] += 1
 
+        first_response_hours = brief.get('firstResponseHours')
+        if first_response_hours is not None:
+            try:
+                hours = float(first_response_hours)
+                first_response_hours_values.append(hours)
+                contacted_count += 1
+                if hours <= 24:
+                    responded_within_24h += 1
+            except (TypeError, ValueError):
+                continue
+
+    avg_first_response = round(sum(first_response_hours_values) / len(first_response_hours_values), 2) if first_response_hours_values else None
+    response_sla = {
+        'contactedLeads': contacted_count,
+        'respondedWithin24h': responded_within_24h,
+        'respondedWithin24hRate': round((responded_within_24h / contacted_count) * 100, 2) if contacted_count else None,
+        'avgFirstResponseHours': avg_first_response
+    }
+
     return {
         'total': len(briefs),
         'byPriority': by_priority,
         'bySource': by_source,
-        'byStage': by_stage
+        'byStage': by_stage,
+        'responseSLA': response_sla
     }
+
+
+def build_source_performance(briefs):
+    """Aggregate funnel + speed-to-lead metrics by acquisition source."""
+    source_stats = {}
+
+    for brief in briefs:
+        source = brief.get('utmSource') or brief.get('source') or 'unknown'
+        stage = brief.get('stage', 'new')
+        priority = brief.get('priority', 'low')
+
+        if source not in source_stats:
+            source_stats[source] = {
+                'source': source,
+                'total': 0,
+                'highPriority': 0,
+                'contacted': 0,
+                'qualified': 0,
+                'proposalSent': 0,
+                'won': 0,
+                'lost': 0,
+                'respondedWithin24h': 0,
+                'firstResponseHoursValues': []
+            }
+
+        stats = source_stats[source]
+        stats['total'] += 1
+
+        if priority == 'high':
+            stats['highPriority'] += 1
+
+        if stage in {'contacted', 'qualified', 'proposal_sent', 'won', 'lost'}:
+            stats['contacted'] += 1
+        if stage in {'qualified', 'proposal_sent', 'won', 'lost'}:
+            stats['qualified'] += 1
+        if stage in {'proposal_sent', 'won', 'lost'}:
+            stats['proposalSent'] += 1
+        if stage == 'won':
+            stats['won'] += 1
+        if stage == 'lost':
+            stats['lost'] += 1
+
+        first_response_hours = brief.get('firstResponseHours')
+        if first_response_hours is not None:
+            try:
+                hours = float(first_response_hours)
+                stats['firstResponseHoursValues'].append(hours)
+                if hours <= 24:
+                    stats['respondedWithin24h'] += 1
+            except (TypeError, ValueError):
+                pass
+
+    performance = []
+    for stats in source_stats.values():
+        contacted = stats['contacted']
+        proposal_sent = stats['proposalSent']
+        total = stats['total']
+
+        avg_first_response_hours = None
+        if stats['firstResponseHoursValues']:
+            avg_first_response_hours = round(sum(stats['firstResponseHoursValues']) / len(stats['firstResponseHoursValues']), 2)
+
+        performance.append({
+            'source': stats['source'],
+            'total': total,
+            'highPriority': stats['highPriority'],
+            'contacted': contacted,
+            'qualified': stats['qualified'],
+            'proposalSent': proposal_sent,
+            'won': stats['won'],
+            'lost': stats['lost'],
+            'winRateFromTotal': round((stats['won'] / total) * 100, 2) if total else 0.0,
+            'proposalRateFromTotal': round((proposal_sent / total) * 100, 2) if total else 0.0,
+            'closeRateFromProposal': round((stats['won'] / proposal_sent) * 100, 2) if proposal_sent else 0.0,
+            'respondedWithin24h': stats['respondedWithin24h'],
+            'responseWithin24hRate': round((stats['respondedWithin24h'] / contacted) * 100, 2) if contacted else None,
+            'avgFirstResponseHours': avg_first_response_hours
+        })
+
+    performance.sort(
+        key=lambda item: (
+            item['won'],
+            item['proposalSent'],
+            item['highPriority'],
+            item['total']
+        ),
+        reverse=True
+    )
+
+    return performance
 
 
 def authorize_dashboard_request():
@@ -657,9 +771,19 @@ def update_project_brief(brief_id):
 
         if candidate_id == brief_id:
             brief['stage'] = requested_stage
-            brief['stageUpdatedAt'] = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            brief['stageUpdatedAt'] = now_iso
             if status_notes:
                 brief['statusNotes'] = status_notes
+
+            if requested_stage in {'contacted', 'qualified', 'proposal_sent', 'won', 'lost'} and not brief.get('contactedAt'):
+                brief['contactedAt'] = now_iso
+                submitted_at = parse_iso_datetime(brief.get('submittedAt'))
+                contacted_at = parse_iso_datetime(now_iso)
+                if submitted_at and contacted_at:
+                    first_response_hours = max(0.0, (contacted_at - submitted_at).total_seconds() / 3600.0)
+                    brief['firstResponseHours'] = round(first_response_hours, 2)
+
             updated_brief = brief
             break
 
@@ -715,6 +839,26 @@ def get_project_briefs_follow_up_queue():
         'success': True,
         'limit': limit,
         'followUp': queue_data
+    })
+
+
+@app.route('/api/project-briefs/source-performance', methods=['GET'])
+def get_project_briefs_source_performance():
+    """Return per-source funnel and speed metrics for outreach allocation decisions."""
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
+
+    limit = request.args.get('limit', default=200, type=int)
+    limit = max(1, min(limit, 1000))
+
+    briefs = load_recent_project_briefs(limit=limit)
+    performance = build_source_performance(briefs)
+
+    return jsonify({
+        'success': True,
+        'limit': limit,
+        'performance': performance
     })
 
 
