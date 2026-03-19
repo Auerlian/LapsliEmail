@@ -37,6 +37,7 @@ LEAD_ALERT_WEBHOOK_URL = os.environ.get('LEAD_ALERT_WEBHOOK_URL', '').strip()
 LEAD_ALERT_MIN_PRIORITY = os.environ.get('LEAD_ALERT_MIN_PRIORITY', 'high').strip().lower()
 LEAD_STAGES = {'new', 'contacted', 'qualified', 'proposal_sent', 'won', 'lost'}
 FOLLOW_UP_STAGES = {'new', 'contacted', 'qualified', 'proposal_sent'}
+BRIEF_INTENTS = {'conversion', 'mvp', 'automation', 'other'}
 
 class HTMLToText(HTMLParser):
     """Simple HTML to text converter for fallback"""
@@ -213,6 +214,13 @@ def is_valid_lead_stage(stage):
     return stage in LEAD_STAGES
 
 
+def normalize_brief_intent(value):
+    intent = str(value or '').strip().lower()
+    if intent in BRIEF_INTENTS:
+        return intent
+    return 'other'
+
+
 def send_email_via_lead_smtp(recipient, subject, body):
     """Shared SMTP sender for lead notifications and acknowledgements."""
     if not all([LEAD_SMTP_SERVER, LEAD_SMTP_PORT, LEAD_SMTP_USER, LEAD_SMTP_PASS, LEAD_FROM_EMAIL]):
@@ -316,6 +324,9 @@ def score_project_brief(payload):
     if project_url.startswith('http://') or project_url.startswith('https://'):
         score += 1
 
+    if normalize_brief_intent(payload.get('briefIntent')) != 'other':
+        score += 1
+
     if score >= 10:
         priority = 'high'
     elif score >= 7:
@@ -338,6 +349,7 @@ Name: {payload['name']}
 Email: {payload['email']}
 Budget: {payload['budget']}
 Timeline: {payload['timeline']}
+Intent: {payload.get('briefIntent', 'other')}
 Project URL: {payload.get('projectUrl') or 'Not provided'}
 Lead Score: {payload['leadScore']} ({payload['priority']})
 Submitted At: {payload['submittedAt']}
@@ -640,6 +652,7 @@ def build_follow_up_queue(briefs, sla_hours=24):
             'summary': brief.get('summary', ''),
             'budget': brief.get('budget', ''),
             'timeline': brief.get('timeline', ''),
+            'briefIntent': brief.get('briefIntent', 'other'),
             'projectUrl': brief.get('projectUrl', ''),
             'urgencyScore': urgency_score
         })
@@ -751,6 +764,7 @@ def build_daily_plan(briefs, sla_hours=24):
             'priority': item.get('priority', 'low'),
             'stage': item.get('stage', 'new'),
             'source': item.get('source', 'unknown'),
+            'briefIntent': item.get('briefIntent', 'other'),
             'hoursSinceStageUpdate': item.get('hoursSinceStageUpdate', 0),
             'recommendedAction': item.get('recommendedAction', 'Follow up with next concrete step')
         })
@@ -841,6 +855,7 @@ def build_first_response_draft(brief):
     priority = brief.get('priority') or 'low'
     summary = (brief.get('summary') or '').strip()
     project_url = (brief.get('projectUrl') or '').strip()
+    brief_intent = normalize_brief_intent(brief.get('briefIntent'))
 
     project_signals = extract_project_url_signals(project_url) if project_url else {'available': False, 'reason': 'project_url_missing'}
 
@@ -860,7 +875,16 @@ def build_first_response_draft(brief):
     while len(observations) < 3:
         observations.append("I’ll keep changes implementation-first so you get shipped improvements, not just recommendations.")
 
-    recommended_next_step = "Reply with your top KPI + access constraints, and I’ll send a concrete sprint plan within 24 hours."
+    intent_next_step_map = {
+        'conversion': 'Reply with your current conversion baseline + target, and I’ll map a sprint to improve qualified enquiries within your timeframe.',
+        'mvp': 'Reply with your must-have user flow and launch date, and I’ll send a lean MVP sprint scope you can ship quickly.',
+        'automation': 'Reply with the process you want to automate first and current tools, and I’ll send an automation sprint plan with integration steps.'
+    }
+
+    recommended_next_step = intent_next_step_map.get(
+        brief_intent,
+        "Reply with your top KPI + access constraints, and I’ll send a concrete sprint plan within 24 hours."
+    )
     if priority == 'high':
         recommended_next_step = "Given urgency/fit, I recommend a 20-minute scope call today/tomorrow to lock sprint scope and start this week."
 
@@ -889,6 +913,7 @@ def build_first_response_draft(brief):
         'body': "\n".join(body_lines),
         'recommendedNextStep': recommended_next_step,
         'projectSignals': project_signals,
+        'briefIntent': brief_intent,
         'summaryPreview': summary[:320] + ('…' if len(summary) > 320 else '')
     }
 
@@ -1077,7 +1102,7 @@ def project_brief():
     if data.get('website'):
         return jsonify({'success': False, 'error': 'Spam detected'}), 400
 
-    required_fields = ['name', 'email', 'budget', 'timeline', 'summary']
+    required_fields = ['email', 'budget', 'timeline', 'summary']
     missing = [field for field in required_fields if not str(data.get(field, '')).strip()]
     if missing:
         return jsonify({'success': False, 'error': f"Missing required fields: {', '.join(missing)}"}), 400
@@ -1091,12 +1116,14 @@ def project_brief():
         return jsonify({'success': False, 'error': 'Invalid projectUrl format. Use full URL including http(s)://'}), 400
 
     submitted_at = datetime.now(timezone.utc).isoformat()
+    submitted_name = str(data.get('name', '')).strip()
     payload = {
-        'name': str(data.get('name', '')).strip(),
+        'name': submitted_name[:80] if submitted_name else 'there',
         'email': email,
         'budget': str(data.get('budget', '')).strip(),
         'timeline': str(data.get('timeline', '')).strip(),
         'projectUrl': project_url[:300],
+        'briefIntent': normalize_brief_intent(data.get('briefIntent')),
         'summary': str(data.get('summary', '')).strip(),
         'source': str(data.get('source', 'lapslie.com')).strip(),
         'utmSource': str(data.get('utmSource', '')).strip()[:120],
@@ -1131,6 +1158,7 @@ def project_brief():
             'briefId': payload['briefId'],
             'priority': payload['priority'],
             'leadScore': payload['leadScore'],
+            'briefIntent': payload['briefIntent'],
             'stage': payload['stage'],
             'notification': notify_result,
             'acknowledgement': acknowledgement_result,

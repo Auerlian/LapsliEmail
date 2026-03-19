@@ -189,6 +189,7 @@ Captures freelance leads from Lapslie.com, scores priority, logs them to `data/p
   "email": "jane@startup.com",
   "budget": "£2,500–£5,000",
   "timeline": "Within 1 month",
+  "briefIntent": "conversion",
   "projectUrl": "https://startup.com",
   "summary": "Need conversion-focused rebuild + analytics",
   "website": "", 
@@ -211,6 +212,7 @@ Captures freelance leads from Lapslie.com, scores priority, logs them to `data/p
   "briefId": "7f1ad2c4e92a31b8",
   "priority": "high",
   "leadScore": 11,
+  "briefIntent": "conversion",
   "stage": "new",
   "notification": {
     "sent": true
@@ -237,6 +239,10 @@ Optional lead-system env vars:
 - `LEAD_DASHBOARD_TOKEN` (required for secure lead inbox + summary endpoints)
 - `LEAD_ALERT_WEBHOOK_URL` (optional webhook for instant lead/stage alerts)
 - `LEAD_ALERT_MIN_PRIORITY` (`low|medium|high`, default `high`)
+
+`name` is optional (defaults to a neutral greeting when omitted).
+
+`briefIntent` is optional but recommended for better reply quality (`conversion|mvp|automation|other`).
 
 `projectUrl` is optional but recommended for faster qualification.
 

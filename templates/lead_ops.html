@@ -176,7 +176,7 @@
       renderPlanList('planNotes', plan.executionNotes || [], (item) => escapeHtml(item));
       renderPlanList('planTopActions', plan.topActions || [], (item) => {
         const action = escapeHtml(item.recommendedAction || 'Follow up');
-        return `<code>${escapeHtml(item.briefId || '')}</code> • <strong>${escapeHtml(item.name || 'Unknown')}</strong> (${escapeHtml(item.priority || 'low')}/${escapeHtml(item.stage || 'new')}) — ${action}`;
+        return `<code>${escapeHtml(item.briefId || '')}</code> • <strong>${escapeHtml(item.name || 'Unknown')}</strong> (${escapeHtml(item.priority || 'low')}/${escapeHtml(item.stage || 'new')}/${escapeHtml(item.briefIntent || 'other')}) — ${action}`;
       });
       renderPlanList('planSourceRecommendations', plan.sourceRecommendationDetails || [], (item) => {
         const shift = Number(item.allocationShiftPercent || 0);
@@ -234,6 +234,7 @@
             <span>• SLA: ${lead.overdue ? `Overdue by ${Math.abs(Number(lead.hoursUntilBreach || 0)).toFixed(1)}h` : `${Number(lead.hoursUntilBreach || 0).toFixed(1)}h left`}</span>
             ${lead.budget ? `<span>• Budget: ${escapeHtml(lead.budget)}</span>` : ''}
             ${lead.timeline ? `<span>• Timeline: ${escapeHtml(lead.timeline)}</span>` : ''}
+            ${lead.briefIntent ? `<span>• Intent: ${escapeHtml(lead.briefIntent)}</span>` : ''}
           </div>
           <div>${escapeHtml(lead.summary || '(No summary provided)')}</div>
           ${lead.projectUrl ? `<div style="margin-top:6px;"><a href="${escapeHtml(lead.projectUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(lead.projectUrl)}</a></div>` : ''}
