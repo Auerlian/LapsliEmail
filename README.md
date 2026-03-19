@@ -394,6 +394,47 @@ Returns open leads ranked by urgency so you can enforce a response SLA and focus
 }
 ```
 
+### GET /api/project-briefs/daily-plan
+Returns a single operator-focused plan that combines follow-up urgency with source allocation guidance.
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Query params:**
+- `limit` (1-1000, default 200)
+- `slaHours` (1-168, default 24)
+
+**Response:**
+```json
+{
+  "success": true,
+  "limit": 200,
+  "plan": {
+    "slaHours": 24,
+    "openLeads": 8,
+    "overdueLeads": 3,
+    "topActions": [
+      {
+        "briefId": "7f1ad2c4e92a31b8",
+        "name": "Jane Founder",
+        "priority": "high",
+        "stage": "qualified",
+        "source": "linkedin",
+        "hoursSinceStageUpdate": 31.6,
+        "recommendedAction": "Send scoped proposal and confirm decision timeline"
+      }
+    ],
+    "sourceRecommendations": [
+      "Double down on linkedin (won=2, proposalSent=4).",
+      "Reduce low-yield effort on x until conversion proof improves."
+    ],
+    "executionNotes": [
+      "Clear overdue queue first: 3 leads beyond 24h SLA."
+    ]
+  }
+}
+```
+
 ### POST /send_emails
 Sends emails to recipients.
 

@@ -623,6 +623,55 @@ def build_follow_up_queue(briefs, sla_hours=24):
         'queue': queue
     }
 
+
+def build_daily_plan(briefs, sla_hours=24):
+    """Combine queue urgency + source performance into a focused daily execution plan."""
+    follow_up = build_follow_up_queue(briefs, sla_hours=sla_hours)
+    performance = build_source_performance(briefs)
+
+    queue = follow_up.get('queue', [])
+    top_actions = []
+    for item in queue[:5]:
+        top_actions.append({
+            'briefId': item.get('briefId'),
+            'name': item.get('name', ''),
+            'priority': item.get('priority', 'low'),
+            'stage': item.get('stage', 'new'),
+            'source': item.get('source', 'unknown'),
+            'hoursSinceStageUpdate': item.get('hoursSinceStageUpdate', 0),
+            'recommendedAction': item.get('recommendedAction', 'Follow up with next concrete step')
+        })
+
+    strongest_source = performance[0] if performance else None
+    weakest_source = performance[-1] if performance else None
+
+    source_recommendations = []
+    if strongest_source:
+        source_recommendations.append(
+            f"Double down on {strongest_source.get('source', 'unknown')} (won={strongest_source.get('won', 0)}, proposalSent={strongest_source.get('proposalSent', 0)})."
+        )
+    if weakest_source and weakest_source.get('source') != strongest_source.get('source'):
+        source_recommendations.append(
+            f"Reduce low-yield effort on {weakest_source.get('source', 'unknown')} until conversion proof improves."
+        )
+
+    execution_notes = []
+    if follow_up.get('overdueLeads', 0) > 0:
+        execution_notes.append(
+            f"Clear overdue queue first: {follow_up.get('overdueLeads', 0)} leads beyond {sla_hours}h SLA."
+        )
+    if not execution_notes:
+        execution_notes.append("No overdue leads. Prioritize top urgency leads and proposal follow-through.")
+
+    return {
+        'slaHours': sla_hours,
+        'openLeads': follow_up.get('openLeads', 0),
+        'overdueLeads': follow_up.get('overdueLeads', 0),
+        'topActions': top_actions,
+        'sourceRecommendations': source_recommendations,
+        'executionNotes': execution_notes
+    }
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -919,6 +968,29 @@ def get_project_briefs_source_performance():
         'success': True,
         'limit': limit,
         'performance': performance
+    })
+
+
+@app.route('/api/project-briefs/daily-plan', methods=['GET'])
+def get_project_briefs_daily_plan():
+    """Return a compact daily operator plan for lead follow-up and channel allocation."""
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
+
+    limit = request.args.get('limit', default=200, type=int)
+    limit = max(1, min(limit, 1000))
+
+    sla_hours = request.args.get('slaHours', default=24, type=int)
+    sla_hours = max(1, min(sla_hours, 168))
+
+    briefs = load_recent_project_briefs(limit=limit)
+    plan = build_daily_plan(briefs, sla_hours=sla_hours)
+
+    return jsonify({
+        'success': True,
+        'limit': limit,
+        'plan': plan
     })
 
 
