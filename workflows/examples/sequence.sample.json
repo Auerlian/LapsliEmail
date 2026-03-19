@@ -1,0 +1,18 @@
+[
+  {
+    "id": "intro",
+    "subject": "Quick idea for {company}",
+    "text_body_file": "templates/01_intro.txt",
+    "html_body_file": "templates/01_intro.html"
+  },
+  {
+    "id": "followup",
+    "subject": "Following up, {name}",
+    "text_body_file": "templates/02_followup.txt"
+  },
+  {
+    "id": "last-call",
+    "subject": "Should I close your file, {name}?",
+    "text_body_file": "templates/03_last_call.txt"
+  }
+]

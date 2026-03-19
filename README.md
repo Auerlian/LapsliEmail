@@ -28,6 +28,40 @@ python3 app.py
 http://127.0.0.1:5000
 ```
 
+## Easy Bulk Email Workflow (CSV + Sequence Templates)
+
+For a simple CLI workflow (non-technical operator friendly), use:
+
+- `workflows/bulk_email_sequence.py` (default dry-run)
+- `workflows/run_bulk_sequence_starter.sh` (starter command)
+- `workflows/README_BULK_EMAIL_WORKFLOW.md` (step-by-step usage)
+- `workflows/examples/` (sample leads + templates)
+
+Quick start:
+
+```bash
+cd LapsliEmail
+./workflows/run_bulk_sequence_starter.sh
+```
+
+Send mode uses SMTP with rate limiting + retry backoff:
+
+```bash
+export SMTP_HOST="smtp-relay.brevo.com"
+export SMTP_PORT="587"
+export SMTP_USER="your_smtp_user"
+export SMTP_PASS="your_smtp_password"
+export FROM_EMAIL="you@yourdomain.com"
+
+python3 workflows/bulk_email_sequence.py \
+  --leads-csv workflows/examples/leads.sample.csv \
+  --sequence-json workflows/examples/sequence.sample.json \
+  --send \
+  --rate-per-minute 20 \
+  --retries 3 \
+  --backoff-seconds 2
+```
+
 ## Configuration
 
 ### SMTP Settings (Brevo)

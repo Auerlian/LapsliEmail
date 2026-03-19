@@ -1,0 +1,8 @@
+Hi {name},
+
+Just bubbling this up in case it got buried.
+
+Happy to send over the 3-point audit for {company} if useful.
+
+Best,
+James
