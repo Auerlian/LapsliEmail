@@ -148,6 +148,7 @@ Open `/lead-ops` in the browser for a lightweight daily operator console that co
 
 What it supports:
 - Pulls `GET /api/project-briefs/follow-up-queue` with configurable SLA window.
+- Pulls `GET /api/project-briefs/daily-plan` to show open/overdue counts, top actions, and source allocation guidance.
 - One-click first-response execution via `POST /api/project-briefs/<briefId>/first-response-send`.
 - One-click stage-aware follow-up via `POST /api/project-briefs/<briefId>/follow-up-send`.
 - Stage updates via `PATCH /api/project-briefs/<briefId>`.

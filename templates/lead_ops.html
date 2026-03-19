@@ -56,18 +56,55 @@
     .ok { color: var(--ok); }
     .warn { color: var(--warn); }
     .bad { color: var(--bad); }
+    .planGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 10px 0 14px; }
+    .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #0c1529; }
+    .kpiLabel { color: var(--muted); font-size: 12px; }
+    .kpiValue { font-size: 18px; font-weight: 700; margin-top: 3px; }
+    ul { margin: 8px 0; padding-left: 18px; }
+    li { margin-bottom: 6px; }
+    code { color: #d6e3ff; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Lead Ops Console</h1>
-    <p>Daily action view for fast follow-up. Pull queue, send first response, and stage-update in one place.</p>
+    <p>Daily action view for fast follow-up and channel focus. Pull queue, execute sends, and stage-update in one place.</p>
 
     <div class="panel controls">
       <input id="token" type="password" placeholder="LEAD_DASHBOARD_TOKEN" />
       <input id="slaHours" type="number" min="1" max="168" value="24" title="SLA hours" />
       <input id="limit" type="number" min="1" max="100" value="25" title="Queue size" />
-      <button id="refreshBtn">Refresh Queue</button>
+      <button id="refreshBtn">Refresh Queue + Plan</button>
+    </div>
+
+    <div class="panel">
+      <strong>Daily plan: </strong><span id="planStatus" class="warn">Not loaded</span>
+      <div class="planGrid">
+        <div class="kpi">
+          <div class="kpiLabel">Open leads</div>
+          <div class="kpiValue" id="planOpenLeads">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpiLabel">Overdue leads</div>
+          <div class="kpiValue" id="planOverdueLeads">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpiLabel">SLA window (hours)</div>
+          <div class="kpiValue" id="planSlaHours">—</div>
+        </div>
+      </div>
+      <div>
+        <strong>Execution notes</strong>
+        <ul id="planNotes"></ul>
+      </div>
+      <div>
+        <strong>Top actions</strong>
+        <ul id="planTopActions"></ul>
+      </div>
+      <div>
+        <strong>Source allocation</strong>
+        <ul id="planSourceRecommendations"></ul>
+      </div>
     </div>
 
     <div class="panel">
@@ -79,6 +116,7 @@
   <script>
     const statusText = document.getElementById('statusText');
     const queueEl = document.getElementById('queue');
+    const planStatus = document.getElementById('planStatus');
 
     function authHeaders() {
       const token = document.getElementById('token').value.trim();
@@ -112,6 +150,58 @@
       renderQueue(data.queue || []);
       statusText.textContent = `Loaded ${data.count || 0} lead(s)`;
       statusText.className = 'ok';
+    }
+
+    function renderPlanList(containerId, entries, formatter) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if (!entries || !entries.length) {
+        container.innerHTML = '<li><span class="warn">No items yet.</span></li>';
+        return;
+      }
+      for (const item of entries) {
+        const li = document.createElement('li');
+        li.innerHTML = formatter(item);
+        container.appendChild(li);
+      }
+    }
+
+    function renderDailyPlan(plan) {
+      document.getElementById('planOpenLeads').textContent = String(plan.openLeads ?? '—');
+      document.getElementById('planOverdueLeads').textContent = String(plan.overdueLeads ?? '—');
+      document.getElementById('planSlaHours').textContent = String(plan.slaHours ?? '—');
+
+      renderPlanList('planNotes', plan.executionNotes || [], (item) => escapeHtml(item));
+      renderPlanList('planTopActions', plan.topActions || [], (item) => {
+        const action = escapeHtml(item.recommendedAction || 'Follow up');
+        return `<code>${escapeHtml(item.briefId || '')}</code> • <strong>${escapeHtml(item.name || 'Unknown')}</strong> (${escapeHtml(item.priority || 'low')}/${escapeHtml(item.stage || 'new')}) — ${action}`;
+      });
+      renderPlanList('planSourceRecommendations', plan.sourceRecommendationDetails || [], (item) => {
+        return `<strong>${escapeHtml((item.action || 'review').toUpperCase())}</strong> ${escapeHtml(item.source || 'unknown')} — ${escapeHtml(item.reason || '')}`;
+      });
+    }
+
+    async function fetchDailyPlan() {
+      const slaHours = Number(document.getElementById('slaHours').value || 24);
+      const limit = Number(document.getElementById('limit').value || 25);
+      planStatus.textContent = 'Loading...';
+      planStatus.className = 'warn';
+
+      const res = await fetch(`/api/project-briefs/daily-plan?slaHours=${slaHours}&limit=${Math.max(limit, 200)}`, {
+        headers: authHeaders()
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to load daily plan');
+      }
+
+      renderDailyPlan(data.plan || {});
+      planStatus.textContent = 'Loaded';
+      planStatus.className = 'ok';
+    }
+
+    async function refreshAll() {
+      await Promise.all([fetchQueue(), fetchDailyPlan()]);
     }
 
     function renderQueue(items) {
@@ -225,15 +315,15 @@
         } else if (action === 'send') {
           result = await sendFirstResponse(briefId);
           output.textContent = `Sent first response\nStage: ${result.stage || ''}`;
-          await fetchQueue();
+          await refreshAll();
         } else if (action === 'followup') {
           result = await sendFollowUp(briefId);
           output.textContent = `Sent follow-up\nStage: ${result.stage || ''}`;
-          await fetchQueue();
+          await refreshAll();
         } else {
           result = await patchStage(briefId, action);
           output.textContent = `Updated to ${result.brief?.stage || action}`;
-          await fetchQueue();
+          await refreshAll();
         }
       } catch (err) {
         output.textContent = `Error: ${err.message}`;
@@ -244,10 +334,12 @@
 
     document.getElementById('refreshBtn').addEventListener('click', async () => {
       try {
-        await fetchQueue();
+        await refreshAll();
       } catch (err) {
         statusText.textContent = err.message;
         statusText.className = 'bad';
+        planStatus.textContent = err.message;
+        planStatus.className = 'bad';
       }
     });
   </script>
