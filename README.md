@@ -150,6 +150,7 @@ What it supports:
 - Pulls `GET /api/project-briefs/follow-up-queue` with configurable SLA window.
 - Pulls `GET /api/project-briefs/daily-plan` to show open/overdue counts, top actions, and source allocation guidance.
 - One-click first-response execution via `POST /api/project-briefs/<briefId>/first-response-send`.
+- One-click proposal send + stage move via `POST /api/project-briefs/<briefId>/proposal-send`.
 - One-click stage-aware follow-up via `POST /api/project-briefs/<briefId>/follow-up-send`.
 - Stage updates via `PATCH /api/project-briefs/<briefId>`.
 - On-demand draft preview via `GET /api/project-briefs/<briefId>/first-response-draft`.
@@ -545,6 +546,41 @@ This lets the operator go from queue -> draft -> sent reply in one API flow.
     "subject": "Re: your project brief — suggested first sprint",
     "recommendedNextStep": "Given urgency/fit, I recommend a 20-minute scope call today/tomorrow to lock sprint scope and start this week."
   }
+}
+```
+
+### POST /api/project-briefs/<briefId>/proposal-send
+Sends a proposal-ready email and sets the lead stage to `proposal_sent` in one action.
+
+Use this when a lead is already warm (`new`, `contacted`, or `qualified`) and you want to move directly into decision mode without manual drafting.
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Request (optional fields):**
+```json
+{
+  "subject": "Optional override subject",
+  "body": "Optional override body",
+  "statusNotes": "Sent proposal options A/B"
+}
+```
+
+**Behavior:**
+- Builds a concise proposal draft from brief context if no overrides are provided.
+- Sends via configured lead SMTP settings.
+- Moves stage to `proposal_sent`, records `lastProposalSentAt`, and appends timestamped status notes.
+- Emits `lead.stage_updated` webhook alert when stage changes into `proposal_sent`.
+
+**Response:**
+```json
+{
+  "success": true,
+  "briefId": "7f1ad2c4e92a31b8",
+  "email": {"sent": true},
+  "stage": "proposal_sent",
+  "previousStage": "qualified",
+  "proposalSentAt": "2026-03-19T06:10:00.000000+00:00"
 }
 ```
 

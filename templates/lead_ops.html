@@ -242,6 +242,7 @@
             <button data-action="draft" data-id="${lead.briefId}">Load draft</button>
             <button data-action="send" data-id="${lead.briefId}">Send first response</button>
             <button data-action="followup" data-id="${lead.briefId}">Send follow-up</button>
+            <button data-action="proposal" data-id="${lead.briefId}">Send proposal</button>
             <button data-action="contacted" data-id="${lead.briefId}">Mark contacted</button>
             <button data-action="qualified" data-id="${lead.briefId}">Mark qualified</button>
             <button data-action="proposal_sent" data-id="${lead.briefId}">Mark proposal_sent</button>
@@ -277,7 +278,7 @@
       const res = await fetch(`/api/project-briefs/${briefId}/first-response-send`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ autoMarkContacted: true, statusNotes: note })
+        body: JSON.stringify({ markContacted: true, statusNotes: note })
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Send failed');
@@ -293,6 +294,18 @@
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Follow-up failed');
+      return data;
+    }
+
+    async function sendProposal(briefId) {
+      const note = document.querySelector(`textarea[data-note="${briefId}"]`)?.value || '';
+      const res = await fetch(`/api/project-briefs/${briefId}/proposal-send`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ statusNotes: note })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Proposal send failed');
       return data;
     }
 
@@ -328,6 +341,10 @@
         } else if (action === 'followup') {
           result = await sendFollowUp(briefId);
           output.textContent = `Sent follow-up\nStage: ${result.stage || ''}`;
+          await refreshAll();
+        } else if (action === 'proposal') {
+          result = await sendProposal(briefId);
+          output.textContent = `Sent proposal\nStage: ${result.stage || ''}`;
           await refreshAll();
         } else {
           result = await patchStage(briefId, action);

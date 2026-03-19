@@ -939,6 +939,42 @@ def build_follow_up_response_draft(brief):
         'stage': stage
     }
 
+
+def build_proposal_response_draft(brief):
+    """Generate a concise proposal email draft to move qualified leads into decision mode."""
+    name = brief.get('name') or 'there'
+    budget = brief.get('budget') or 'Not specified'
+    timeline = brief.get('timeline') or 'Not specified'
+    summary = (brief.get('summary') or '').strip()
+
+    summary_line = summary[:180] + ('…' if len(summary) > 180 else '') if summary else 'the goals in your brief'
+    subject = 'One-page proposal + start options'
+
+    body = "\n".join([
+        f"Hi {name},",
+        "",
+        "Great brief — I’ve pulled this into a practical proposal you can review quickly.",
+        f"Focus area: {summary_line}",
+        f"Constraints noted: budget {budget} · timeline {timeline}.",
+        "",
+        "Proposed structure:",
+        "• Option A (fastest): Conversion sprint in 7–10 days",
+        "• Option B (deeper): Conversion + analytics implementation in 2–3 weeks",
+        "• Both options include clear deliverables, acceptance criteria, and next-step timeline",
+        "",
+        "If this direction looks right, reply with A or B and I’ll send the final scope + fixed price today.",
+        f"If easier, book a short fit call here: {LEAD_CALENDLY_URL}",
+        "",
+        "Best,",
+        "James"
+    ])
+
+    return {
+        'subject': subject,
+        'body': body,
+        'summaryPreview': summary_line
+    }
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -1361,6 +1397,87 @@ def send_project_brief_first_response(brief_id):
         'draftUsed': {
             'subject': subject,
             'recommendedNextStep': draft.get('recommendedNextStep', '')
+        }
+    })
+
+
+@app.route('/api/project-briefs/<brief_id>/proposal-send', methods=['POST'])
+def send_project_brief_proposal(brief_id):
+    """Send proposal-ready email and move lead into proposal_sent stage."""
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
+
+    briefs = load_all_project_briefs()
+    target_brief = None
+
+    for brief in briefs:
+        candidate_id = brief.get('briefId')
+        if not candidate_id:
+            identity_seed = f"{brief.get('email', 'unknown')}|{brief.get('submittedAt', '')}|{brief.get('name', '')}"
+            candidate_id = compute_hash(identity_seed)
+            brief['briefId'] = candidate_id
+
+        if candidate_id == brief_id:
+            target_brief = brief
+            break
+
+    if not target_brief:
+        return jsonify({'success': False, 'error': 'Brief not found'}), 404
+
+    stage = (target_brief.get('stage') or 'new').strip().lower()
+    if stage not in {'new', 'contacted', 'qualified', 'proposal_sent'}:
+        return jsonify({
+            'success': False,
+            'error': 'Proposal send is only available for new, contacted, qualified, or proposal_sent stages'
+        }), 400
+
+    recipient = (target_brief.get('email') or '').strip()
+    if not recipient:
+        return jsonify({'success': False, 'error': 'Brief has no recipient email'}), 400
+
+    data = request.json or {}
+    draft = build_proposal_response_draft(target_brief)
+    subject = str(data.get('subject') or draft.get('subject') or '').strip()
+    body = str(data.get('body') or draft.get('body') or '').strip()
+    status_notes = str(data.get('statusNotes', '')).strip()
+
+    if not subject or not body:
+        return jsonify({'success': False, 'error': 'Unable to send: missing subject or body'}), 400
+
+    send_result = send_email_via_lead_smtp(recipient, subject, body)
+    if not send_result.get('sent'):
+        return jsonify({
+            'success': False,
+            'error': 'Failed to send proposal',
+            'email': send_result
+        }), 503
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    previous_stage, _ = apply_stage_update(
+        target_brief,
+        'proposal_sent',
+        status_notes=(f"Proposal sent via API at {now_iso}. {status_notes}".strip() if status_notes else f"Proposal sent via API at {now_iso}")
+    )
+    target_brief['lastProposalSentAt'] = now_iso
+
+    save_all_project_briefs(briefs)
+
+    alert_result = {'sent': False, 'reason': 'stage_unchanged'}
+    if previous_stage != 'proposal_sent':
+        alert_result = send_lead_alert('lead.stage_updated', target_brief)
+
+    return jsonify({
+        'success': True,
+        'briefId': brief_id,
+        'email': send_result,
+        'stage': target_brief.get('stage', 'proposal_sent'),
+        'previousStage': previous_stage,
+        'proposalSentAt': now_iso,
+        'alert': alert_result,
+        'draftUsed': {
+            'subject': subject,
+            'summaryPreview': draft.get('summaryPreview', '')
         }
     })
 
