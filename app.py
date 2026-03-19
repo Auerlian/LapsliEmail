@@ -33,6 +33,7 @@ LEAD_ACK_ENABLED = os.environ.get('LEAD_ACK_ENABLED', 'true').lower() in ('1', '
 LEAD_CALENDLY_URL = os.environ.get('LEAD_CALENDLY_URL', 'https://calendly.com/lapslie/30min')
 LEAD_DASHBOARD_TOKEN = os.environ.get('LEAD_DASHBOARD_TOKEN', '')
 LEAD_STAGES = {'new', 'contacted', 'qualified', 'proposal_sent', 'won', 'lost'}
+FOLLOW_UP_STAGES = {'new', 'contacted', 'qualified', 'proposal_sent'}
 
 class HTMLToText(HTMLParser):
     """Simple HTML to text converter for fallback"""
@@ -360,6 +361,102 @@ def summarize_project_briefs(briefs):
         'byStage': by_stage
     }
 
+
+def authorize_dashboard_request():
+    """Shared bearer token guard for lead dashboard endpoints."""
+    if not LEAD_DASHBOARD_TOKEN:
+        return jsonify({'success': False, 'error': 'Dashboard token not configured'}), 403
+
+    auth_header = request.headers.get('Authorization', '')
+    expected_auth = f"Bearer {LEAD_DASHBOARD_TOKEN}"
+    if auth_header != expected_auth:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    return None
+
+
+def parse_iso_datetime(value):
+    """Best-effort ISO parser that returns timezone-aware UTC datetimes."""
+    if not value:
+        return None
+
+    try:
+        normalized = str(value).strip().replace('Z', '+00:00')
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def build_follow_up_queue(briefs, sla_hours=24):
+    """Return open leads sorted by urgency against a follow-up SLA."""
+    now = datetime.now(timezone.utc)
+    priority_weight = {'high': 3, 'medium': 2, 'low': 1}
+
+    queue = []
+    overdue_count = 0
+
+    for brief in briefs:
+        stage = brief.get('stage', 'new')
+        if stage not in FOLLOW_UP_STAGES:
+            continue
+
+        anchor = parse_iso_datetime(brief.get('stageUpdatedAt')) or parse_iso_datetime(brief.get('submittedAt'))
+        if not anchor:
+            continue
+
+        hours_since = max(0.0, (now - anchor).total_seconds() / 3600.0)
+        overdue = hours_since >= sla_hours
+        if overdue:
+            overdue_count += 1
+
+        priority = brief.get('priority', 'low')
+        stage_actions = {
+            'new': 'Send first response and qualify scope',
+            'contacted': 'Nudge for missing scope details or call slot',
+            'qualified': 'Send scoped proposal and confirm decision timeline',
+            'proposal_sent': 'Follow up on proposal with clear next step'
+        }
+
+        urgency_score = (
+            (2 if overdue else 0)
+            + priority_weight.get(priority, 1)
+            + min(3, int(hours_since // max(1, sla_hours)))
+        )
+
+        queue.append({
+            'briefId': brief.get('briefId'),
+            'name': brief.get('name', ''),
+            'email': brief.get('email', ''),
+            'priority': priority,
+            'stage': stage,
+            'source': brief.get('utmSource') or brief.get('source') or 'unknown',
+            'submittedAt': brief.get('submittedAt'),
+            'stageUpdatedAt': brief.get('stageUpdatedAt') or brief.get('submittedAt'),
+            'hoursSinceStageUpdate': round(hours_since, 2),
+            'overdue': overdue,
+            'recommendedAction': stage_actions.get(stage, 'Follow up with next concrete step'),
+            'urgencyScore': urgency_score
+        })
+
+    queue.sort(
+        key=lambda item: (
+            1 if item['overdue'] else 0,
+            item['urgencyScore'],
+            item['hoursSinceStageUpdate']
+        ),
+        reverse=True
+    )
+
+    return {
+        'slaHours': sla_hours,
+        'openLeads': len(queue),
+        'overdueLeads': overdue_count,
+        'queue': queue
+    }
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -515,13 +612,9 @@ def project_brief():
 @app.route('/api/project-briefs', methods=['GET'])
 def get_project_briefs():
     """Lightweight lead inbox endpoint for quick qualification and follow-up."""
-    if not LEAD_DASHBOARD_TOKEN:
-        return jsonify({'success': False, 'error': 'Dashboard token not configured'}), 403
-
-    auth_header = request.headers.get('Authorization', '')
-    expected_auth = f"Bearer {LEAD_DASHBOARD_TOKEN}"
-    if auth_header != expected_auth:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
 
     limit = request.args.get('limit', default=25, type=int)
     limit = max(1, min(limit, 100))
@@ -538,13 +631,9 @@ def get_project_briefs():
 @app.route('/api/project-briefs/<brief_id>', methods=['PATCH'])
 def update_project_brief(brief_id):
     """Update lead stage/notes for lightweight pipeline tracking."""
-    if not LEAD_DASHBOARD_TOKEN:
-        return jsonify({'success': False, 'error': 'Dashboard token not configured'}), 403
-
-    auth_header = request.headers.get('Authorization', '')
-    expected_auth = f"Bearer {LEAD_DASHBOARD_TOKEN}"
-    if auth_header != expected_auth:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
 
     data = request.json or {}
     requested_stage = str(data.get('stage', '')).strip().lower()
@@ -589,13 +678,9 @@ def update_project_brief(brief_id):
 @app.route('/api/project-briefs/summary', methods=['GET'])
 def get_project_briefs_summary():
     """Attribution summary endpoint to identify channels generating quality leads."""
-    if not LEAD_DASHBOARD_TOKEN:
-        return jsonify({'success': False, 'error': 'Dashboard token not configured'}), 403
-
-    auth_header = request.headers.get('Authorization', '')
-    expected_auth = f"Bearer {LEAD_DASHBOARD_TOKEN}"
-    if auth_header != expected_auth:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
 
     limit = request.args.get('limit', default=100, type=int)
     limit = max(1, min(limit, 1000))
@@ -607,6 +692,29 @@ def get_project_briefs_summary():
         'success': True,
         'limit': limit,
         'summary': summary
+    })
+
+
+@app.route('/api/project-briefs/follow-up-queue', methods=['GET'])
+def get_project_briefs_follow_up_queue():
+    """Return open leads ranked by urgency against a response SLA."""
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
+
+    limit = request.args.get('limit', default=100, type=int)
+    limit = max(1, min(limit, 500))
+
+    sla_hours = request.args.get('slaHours', default=24, type=int)
+    sla_hours = max(1, min(sla_hours, 168))
+
+    briefs = load_recent_project_briefs(limit=limit)
+    queue_data = build_follow_up_queue(briefs, sla_hours=sla_hours)
+
+    return jsonify({
+        'success': True,
+        'limit': limit,
+        'followUp': queue_data
     })
 
 

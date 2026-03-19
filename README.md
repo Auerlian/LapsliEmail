@@ -301,6 +301,43 @@ Returns a quick attribution + quality + pipeline summary so you can see which ch
 }
 ```
 
+### GET /api/project-briefs/follow-up-queue
+Returns open leads ranked by urgency so you can enforce a response SLA and focus on the highest-leverage follow-ups first.
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Query params:**
+- `limit` (1-500, default 100)
+- `slaHours` (1-168, default 24)
+
+**Response:**
+```json
+{
+  "success": true,
+  "limit": 100,
+  "followUp": {
+    "slaHours": 24,
+    "openLeads": 5,
+    "overdueLeads": 2,
+    "queue": [
+      {
+        "briefId": "7f1ad2c4e92a31b8",
+        "name": "Jane Founder",
+        "email": "jane@startup.com",
+        "priority": "high",
+        "stage": "qualified",
+        "source": "linkedin",
+        "hoursSinceStageUpdate": 31.6,
+        "overdue": true,
+        "recommendedAction": "Send scoped proposal and confirm decision timeline",
+        "urgencyScore": 8
+      }
+    ]
+  }
+}
+```
+
 ### POST /send_emails
 Sends emails to recipients.
 
