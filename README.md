@@ -149,6 +149,7 @@ Open `/lead-ops` in the browser for a lightweight daily operator console that co
 What it supports:
 - Pulls `GET /api/project-briefs/follow-up-queue` with configurable SLA window.
 - One-click first-response execution via `POST /api/project-briefs/<briefId>/first-response-send`.
+- One-click stage-aware follow-up via `POST /api/project-briefs/<briefId>/follow-up-send`.
 - Stage updates via `PATCH /api/project-briefs/<briefId>`.
 - On-demand draft preview via `GET /api/project-briefs/<briefId>/first-response-draft`.
 
@@ -533,6 +534,44 @@ This lets the operator go from queue -> draft -> sent reply in one API flow.
   "draftUsed": {
     "subject": "Re: your project brief — suggested first sprint",
     "recommendedNextStep": "Given urgency/fit, I recommend a 20-minute scope call today/tomorrow to lock sprint scope and start this week."
+  }
+}
+```
+
+### POST /api/project-briefs/<briefId>/follow-up-send
+Sends a stage-aware follow-up email for stalled opportunities in `contacted`, `qualified`, or `proposal_sent`.
+
+Use this to recover warm leads that have gone quiet without manually drafting each nudge.
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Request (optional fields):**
+```json
+{
+  "subject": "Optional override subject",
+  "body": "Optional override body",
+  "statusNotes": "Asked for decision by Friday"
+}
+```
+
+**Behavior:**
+- Builds a follow-up draft from the lead's current stage if no override is provided.
+- Sends via configured lead SMTP settings.
+- Appends a timestamped note and updates `lastFollowUpSentAt` + `stageUpdatedAt`.
+- Keeps stage unchanged (this endpoint is for progression nudges, not stage transitions).
+
+**Response:**
+```json
+{
+  "success": true,
+  "briefId": "7f1ad2c4e92a31b8",
+  "email": {"sent": true},
+  "stage": "qualified",
+  "followUpSentAt": "2026-03-19T05:38:00.000000+00:00",
+  "draftUsed": {
+    "subject": "Shall I send the scoped proposal?",
+    "stage": "qualified"
   }
 }
 ```

@@ -871,6 +871,53 @@ def build_first_response_draft(brief):
         'summaryPreview': summary[:320] + ('…' if len(summary) > 320 else '')
     }
 
+
+def build_follow_up_response_draft(brief):
+    """Generate a stage-aware follow-up draft to recover stalled opportunities."""
+    name = brief.get('name') or 'there'
+    stage = (brief.get('stage') or 'contacted').strip().lower()
+    budget = brief.get('budget') or 'Not specified'
+    timeline = brief.get('timeline') or 'Not specified'
+
+    stage_copy = {
+        'contacted': {
+            'subject': 'Quick follow-up on your project brief',
+            'goal': 'confirm scope details and lock next step',
+            'question': 'If useful, reply with your top KPI for this sprint and I’ll send a tight scope + timeline.'
+        },
+        'qualified': {
+            'subject': 'Shall I send the scoped proposal?',
+            'goal': 'convert qualified interest into a concrete proposal decision',
+            'question': 'If this still makes sense, I can send the one-page proposal today with fixed options and start dates.'
+        },
+        'proposal_sent': {
+            'subject': 'Proposal follow-up — any blockers to moving forward?',
+            'goal': 'surface blockers and drive yes/no decision',
+            'question': 'Happy to adjust scope if needed — is there any blocker I should clear to help you decide this week?'
+        }
+    }
+
+    template = stage_copy.get(stage, stage_copy['contacted'])
+    body = "\n".join([
+        f"Hi {name},",
+        "",
+        "Quick follow-up in case this got buried.",
+        f"I still think we can {template['goal']} based on your brief (budget {budget} · timeline {timeline}).",
+        "",
+        template['question'],
+        "",
+        "If easier, you can also grab a short slot here: " + LEAD_CALENDLY_URL,
+        "",
+        "Best,",
+        "James"
+    ])
+
+    return {
+        'subject': template['subject'],
+        'body': body,
+        'stage': stage
+    }
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -1293,6 +1340,81 @@ def send_project_brief_first_response(brief_id):
         'draftUsed': {
             'subject': subject,
             'recommendedNextStep': draft.get('recommendedNextStep', '')
+        }
+    })
+
+
+@app.route('/api/project-briefs/<brief_id>/follow-up-send', methods=['POST'])
+def send_project_brief_follow_up(brief_id):
+    """Send stage-aware follow-up to reduce stalled deals in contacted/qualified/proposal stages."""
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
+
+    briefs = load_all_project_briefs()
+    target_brief = None
+
+    for brief in briefs:
+        candidate_id = brief.get('briefId')
+        if not candidate_id:
+            identity_seed = f"{brief.get('email', 'unknown')}|{brief.get('submittedAt', '')}|{brief.get('name', '')}"
+            candidate_id = compute_hash(identity_seed)
+            brief['briefId'] = candidate_id
+
+        if candidate_id == brief_id:
+            target_brief = brief
+            break
+
+    if not target_brief:
+        return jsonify({'success': False, 'error': 'Brief not found'}), 404
+
+    stage = (target_brief.get('stage') or 'new').strip().lower()
+    if stage not in {'contacted', 'qualified', 'proposal_sent'}:
+        return jsonify({
+            'success': False,
+            'error': 'Follow-up send is only available for contacted, qualified, or proposal_sent stages'
+        }), 400
+
+    recipient = (target_brief.get('email') or '').strip()
+    if not recipient:
+        return jsonify({'success': False, 'error': 'Brief has no recipient email'}), 400
+
+    data = request.json or {}
+    draft = build_follow_up_response_draft(target_brief)
+    subject = str(data.get('subject') or draft.get('subject') or '').strip()
+    body = str(data.get('body') or draft.get('body') or '').strip()
+    status_notes = str(data.get('statusNotes', '')).strip()
+
+    if not subject or not body:
+        return jsonify({'success': False, 'error': 'Unable to send: missing subject or body'}), 400
+
+    send_result = send_email_via_lead_smtp(recipient, subject, body)
+    if not send_result.get('sent'):
+        return jsonify({
+            'success': False,
+            'error': 'Failed to send follow-up',
+            'email': send_result
+        }), 503
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    base_note = f"Follow-up sent via API at {now_iso}"
+    combined = f"{base_note}. {status_notes}".strip() if status_notes else base_note
+    existing_notes = (target_brief.get('statusNotes') or '').strip()
+    target_brief['statusNotes'] = f"{existing_notes}\n{combined}".strip()[:800]
+    target_brief['lastFollowUpSentAt'] = now_iso
+    target_brief['stageUpdatedAt'] = now_iso
+
+    save_all_project_briefs(briefs)
+
+    return jsonify({
+        'success': True,
+        'briefId': brief_id,
+        'email': send_result,
+        'stage': target_brief.get('stage', stage),
+        'followUpSentAt': now_iso,
+        'draftUsed': {
+            'subject': subject,
+            'stage': draft.get('stage', stage)
         }
     })
 

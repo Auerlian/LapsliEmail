@@ -142,6 +142,7 @@
           <div class="actions">
             <button data-action="draft" data-id="${lead.briefId}">Load draft</button>
             <button data-action="send" data-id="${lead.briefId}">Send first response</button>
+            <button data-action="followup" data-id="${lead.briefId}">Send follow-up</button>
             <button data-action="contacted" data-id="${lead.briefId}">Mark contacted</button>
             <button data-action="qualified" data-id="${lead.briefId}">Mark qualified</button>
             <button data-action="proposal_sent" data-id="${lead.briefId}">Mark proposal_sent</button>
@@ -184,6 +185,18 @@
       return data;
     }
 
+    async function sendFollowUp(briefId) {
+      const note = document.querySelector(`textarea[data-note="${briefId}"]`)?.value || '';
+      const res = await fetch(`/api/project-briefs/${briefId}/follow-up-send`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ statusNotes: note })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Follow-up failed');
+      return data;
+    }
+
     function escapeHtml(text) {
       return String(text || '')
         .replaceAll('&', '&amp;')
@@ -211,7 +224,11 @@
           output.textContent = `Subject: ${result.draft?.subject || ''}\n\n${result.draft?.body || ''}`;
         } else if (action === 'send') {
           result = await sendFirstResponse(briefId);
-          output.textContent = `Sent: ${JSON.stringify(result.sendResult || {}, null, 2)}\nStage: ${result.stage || ''}`;
+          output.textContent = `Sent first response\nStage: ${result.stage || ''}`;
+          await fetchQueue();
+        } else if (action === 'followup') {
+          result = await sendFollowUp(briefId);
+          output.textContent = `Sent follow-up\nStage: ${result.stage || ''}`;
           await fetchQueue();
         } else {
           result = await patchStage(briefId, action);
