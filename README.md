@@ -164,6 +164,42 @@ Validates and cleans recipient list.
 }
 ```
 
+### POST /api/project-brief
+Captures freelance leads from Lapslie.com and logs them to `data/project_briefs.jsonl`.
+
+**Request:**
+```json
+{
+  "name": "Jane Founder",
+  "email": "jane@startup.com",
+  "budget": "£2,500–£5,000",
+  "timeline": "Within 1 month",
+  "summary": "Need conversion-focused rebuild + analytics",
+  "website": "",
+  "source": "lapslie.com"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Project brief received",
+  "notification": {
+    "sent": false,
+    "reason": "lead_smtp_not_configured"
+  }
+}
+```
+
+Optional email notification env vars:
+- `LEAD_SMTP_SERVER`
+- `LEAD_SMTP_PORT` (default `587`)
+- `LEAD_SMTP_USER`
+- `LEAD_SMTP_PASS`
+- `LEAD_FROM_EMAIL`
+- `LEAD_TO_EMAIL` (default `james@lapslie.com`)
+
 ### POST /send_emails
 Sends emails to recipients.
 

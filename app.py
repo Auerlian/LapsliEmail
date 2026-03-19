@@ -11,6 +11,8 @@ import os
 import hashlib
 import csv
 import io
+import json
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 
 app = Flask(__name__)
@@ -19,6 +21,14 @@ CORS(app)
 
 # Single source of truth for email template
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'static', 'email.html')
+PROJECT_BRIEF_LOG_PATH = os.path.join(os.path.dirname(__file__), 'data', 'project_briefs.jsonl')
+
+LEAD_SMTP_SERVER = os.environ.get('LEAD_SMTP_SERVER')
+LEAD_SMTP_PORT = int(os.environ.get('LEAD_SMTP_PORT', '587'))
+LEAD_SMTP_USER = os.environ.get('LEAD_SMTP_USER')
+LEAD_SMTP_PASS = os.environ.get('LEAD_SMTP_PASS')
+LEAD_FROM_EMAIL = os.environ.get('LEAD_FROM_EMAIL', LEAD_SMTP_USER or '')
+LEAD_TO_EMAIL = os.environ.get('LEAD_TO_EMAIL', 'james@lapslie.com')
 
 class HTMLToText(HTMLParser):
     """Simple HTML to text converter for fallback"""
@@ -156,6 +166,46 @@ def add_email_branding(html_content):
     
     return html_content
 
+
+def append_project_brief_log(payload):
+    """Persist project brief submissions as JSON lines for lead visibility."""
+    os.makedirs(os.path.dirname(PROJECT_BRIEF_LOG_PATH), exist_ok=True)
+    with open(PROJECT_BRIEF_LOG_PATH, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + '\n')
+
+
+def notify_project_brief_via_email(payload):
+    """Send project brief notification if LEAD SMTP env vars are configured."""
+    if not all([LEAD_SMTP_SERVER, LEAD_SMTP_PORT, LEAD_SMTP_USER, LEAD_SMTP_PASS, LEAD_FROM_EMAIL, LEAD_TO_EMAIL]):
+        return {'sent': False, 'reason': 'lead_smtp_not_configured'}
+
+    subject = f"[Lapslie.com Lead] {payload['name']} — {payload['budget']}"
+    body = f"""New project brief submitted via Lapslie.com
+
+Name: {payload['name']}
+Email: {payload['email']}
+Budget: {payload['budget']}
+Timeline: {payload['timeline']}
+Submitted At: {payload['submittedAt']}
+Source: {payload['source']}
+
+Summary:
+{payload['summary']}
+"""
+
+    msg = MIMEText(body, 'plain', 'utf-8')
+    msg['From'] = LEAD_FROM_EMAIL
+    msg['To'] = LEAD_TO_EMAIL
+    msg['Subject'] = subject
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP(LEAD_SMTP_SERVER, LEAD_SMTP_PORT) as server:
+        server.starttls(context=context)
+        server.login(LEAD_SMTP_USER, LEAD_SMTP_PASS)
+        server.sendmail(LEAD_FROM_EMAIL, LEAD_TO_EMAIL, msg.as_string())
+
+    return {'sent': True}
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -242,6 +292,48 @@ def parse_csv():
         'fields': result['fields'],
         'email_field': result['email_field']
     })
+
+@app.route('/api/project-brief', methods=['POST'])
+def project_brief():
+    """Capture inbound website project briefs for freelance lead qualification."""
+    data = request.json or {}
+
+    # Honeypot field should stay empty; basic spam filter
+    if data.get('website'):
+        return jsonify({'success': False, 'error': 'Spam detected'}), 400
+
+    required_fields = ['name', 'email', 'budget', 'timeline', 'summary']
+    missing = [field for field in required_fields if not str(data.get(field, '')).strip()]
+    if missing:
+        return jsonify({'success': False, 'error': f"Missing required fields: {', '.join(missing)}"}), 400
+
+    email = str(data.get('email', '')).strip()
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        return jsonify({'success': False, 'error': 'Invalid email format'}), 400
+
+    payload = {
+        'name': str(data.get('name', '')).strip(),
+        'email': email,
+        'budget': str(data.get('budget', '')).strip(),
+        'timeline': str(data.get('timeline', '')).strip(),
+        'summary': str(data.get('summary', '')).strip(),
+        'source': str(data.get('source', 'lapslie.com')).strip(),
+        'submittedAt': datetime.now(timezone.utc).isoformat(),
+        'userAgent': request.headers.get('User-Agent', ''),
+        'ipHash': compute_hash(request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown'))
+    }
+
+    try:
+        append_project_brief_log(payload)
+        notify_result = notify_project_brief_via_email(payload)
+        return jsonify({
+            'success': True,
+            'message': 'Project brief received',
+            'notification': notify_result
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/send_emails', methods=['POST'])
 def send_emails():
