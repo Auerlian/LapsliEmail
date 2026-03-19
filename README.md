@@ -176,7 +176,14 @@ Captures freelance leads from Lapslie.com, scores priority, logs them to `data/p
   "timeline": "Within 1 month",
   "summary": "Need conversion-focused rebuild + analytics",
   "website": "",
-  "source": "lapslie.com"
+  "source": "lapslie.com",
+  "utmSource": "linkedin",
+  "utmMedium": "dm",
+  "utmCampaign": "march-outbound",
+  "utmContent": "founder-offer-v1",
+  "utmTerm": "freelance developer",
+  "referrer": "https://www.linkedin.com/",
+  "landingPath": "/"
 }
 ```
 
@@ -205,7 +212,7 @@ Optional lead-system env vars:
 - `LEAD_TO_EMAIL` (default `james@lapslie.com`)
 - `LEAD_ACK_ENABLED` (default `true`)
 - `LEAD_CALENDLY_URL` (default `https://calendly.com/lapslie/30min`)
-- `LEAD_DASHBOARD_TOKEN` (required for secure lead inbox endpoint)
+- `LEAD_DASHBOARD_TOKEN` (required for secure lead inbox + summary endpoints)
 
 ### GET /api/project-briefs
 Returns recent project briefs for lightweight CRM/inbox use.
@@ -233,6 +240,28 @@ Returns recent project briefs for lightweight CRM/inbox use.
       "submittedAt": "2026-03-19T00:00:00+00:00"
     }
   ]
+}
+```
+
+### GET /api/project-briefs/summary
+Returns a quick attribution + quality summary so you can see which channels are generating high-priority leads.
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Query params:**
+- `limit` (1-1000, default 100)
+
+**Response:**
+```json
+{
+  "success": true,
+  "limit": 100,
+  "summary": {
+    "total": 12,
+    "byPriority": {"high": 5, "medium": 4, "low": 3},
+    "bySource": {"linkedin": 6, "lapslie.com": 4, "x": 2}
+  }
 }
 ```
 

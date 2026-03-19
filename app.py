@@ -303,6 +303,28 @@ def load_recent_project_briefs(limit=25):
 
     return list(reversed(briefs[-limit:]))
 
+
+
+def summarize_project_briefs(briefs):
+    """Create lightweight attribution + priority summary from brief list."""
+    by_priority = {'high': 0, 'medium': 0, 'low': 0}
+    by_source = {}
+
+    for brief in briefs:
+        priority = brief.get('priority', 'low')
+        if priority not in by_priority:
+            by_priority[priority] = 0
+        by_priority[priority] += 1
+
+        source = brief.get('utmSource') or brief.get('source') or 'unknown'
+        by_source[source] = by_source.get(source, 0) + 1
+
+    return {
+        'total': len(briefs),
+        'byPriority': by_priority,
+        'bySource': by_source
+    }
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -415,6 +437,13 @@ def project_brief():
         'timeline': str(data.get('timeline', '')).strip(),
         'summary': str(data.get('summary', '')).strip(),
         'source': str(data.get('source', 'lapslie.com')).strip(),
+        'utmSource': str(data.get('utmSource', '')).strip()[:120],
+        'utmMedium': str(data.get('utmMedium', '')).strip()[:120],
+        'utmCampaign': str(data.get('utmCampaign', '')).strip()[:180],
+        'utmContent': str(data.get('utmContent', '')).strip()[:180],
+        'utmTerm': str(data.get('utmTerm', '')).strip()[:180],
+        'referrer': str(data.get('referrer', '')).strip()[:500],
+        'landingPath': str(data.get('landingPath', '')).strip()[:250],
         'submittedAt': datetime.now(timezone.utc).isoformat(),
         'userAgent': request.headers.get('User-Agent', ''),
         'ipHash': compute_hash(request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown'))
@@ -455,10 +484,35 @@ def get_project_briefs():
     limit = max(1, min(limit, 100))
 
     briefs = load_recent_project_briefs(limit=limit)
+
     return jsonify({
         'success': True,
         'count': len(briefs),
         'briefs': briefs
+    })
+
+
+@app.route('/api/project-briefs/summary', methods=['GET'])
+def get_project_briefs_summary():
+    """Attribution summary endpoint to identify channels generating quality leads."""
+    if not LEAD_DASHBOARD_TOKEN:
+        return jsonify({'success': False, 'error': 'Dashboard token not configured'}), 403
+
+    auth_header = request.headers.get('Authorization', '')
+    expected_auth = f"Bearer {LEAD_DASHBOARD_TOKEN}"
+    if auth_header != expected_auth:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    limit = request.args.get('limit', default=100, type=int)
+    limit = max(1, min(limit, 1000))
+
+    briefs = load_recent_project_briefs(limit=limit)
+    summary = summarize_project_briefs(briefs)
+
+    return jsonify({
+        'success': True,
+        'limit': limit,
+        'summary': summary
     })
 
 
