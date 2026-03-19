@@ -12,7 +12,7 @@ import hashlib
 import csv
 import io
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from html.parser import HTMLParser
 from urllib.request import Request, urlopen
 
@@ -620,6 +620,9 @@ def build_follow_up_queue(briefs, sla_hours=24):
             + min(3, int(hours_since // max(1, sla_hours)))
         )
 
+        breach_at = anchor + timedelta(hours=sla_hours)
+        hours_until_breach = round(sla_hours - hours_since, 2)
+
         queue.append({
             'briefId': brief.get('briefId'),
             'name': brief.get('name', ''),
@@ -630,8 +633,14 @@ def build_follow_up_queue(briefs, sla_hours=24):
             'submittedAt': brief.get('submittedAt'),
             'stageUpdatedAt': brief.get('stageUpdatedAt') or brief.get('submittedAt'),
             'hoursSinceStageUpdate': round(hours_since, 2),
+            'hoursUntilBreach': hours_until_breach,
+            'breachAt': breach_at.isoformat(),
             'overdue': overdue,
             'recommendedAction': stage_actions.get(stage, 'Follow up with next concrete step'),
+            'summary': brief.get('summary', ''),
+            'budget': brief.get('budget', ''),
+            'timeline': brief.get('timeline', ''),
+            'projectUrl': brief.get('projectUrl', ''),
             'urgencyScore': urgency_score
         })
 

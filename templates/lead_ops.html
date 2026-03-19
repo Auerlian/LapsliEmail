@@ -231,9 +231,12 @@
             <span>${escapeHtml(lead.email || '')}</span>
             <span>• Stage: <strong>${escapeHtml(lead.stage || 'new')}</strong></span>
             <span>• Source: ${escapeHtml(lead.utmSource || lead.source || 'unknown')}</span>
-            <span>• SLA: ${lead.overdue ? 'Overdue' : 'In window'}</span>
+            <span>• SLA: ${lead.overdue ? `Overdue by ${Math.abs(Number(lead.hoursUntilBreach || 0)).toFixed(1)}h` : `${Number(lead.hoursUntilBreach || 0).toFixed(1)}h left`}</span>
+            ${lead.budget ? `<span>• Budget: ${escapeHtml(lead.budget)}</span>` : ''}
+            ${lead.timeline ? `<span>• Timeline: ${escapeHtml(lead.timeline)}</span>` : ''}
           </div>
-          <div>${escapeHtml(lead.summary || '')}</div>
+          <div>${escapeHtml(lead.summary || '(No summary provided)')}</div>
+          ${lead.projectUrl ? `<div style="margin-top:6px;"><a href="${escapeHtml(lead.projectUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(lead.projectUrl)}</a></div>` : ''}
           <textarea data-note="${lead.briefId}" placeholder="Status note (optional)"></textarea>
           <div class="actions">
             <button data-action="draft" data-id="${lead.briefId}">Load draft</button>

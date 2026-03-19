@@ -402,7 +402,13 @@ Returns open leads ranked by urgency so you can enforce a response SLA and focus
         "priority": "high",
         "stage": "qualified",
         "source": "linkedin",
+        "budget": "£2,500–£5,000",
+        "timeline": "Within 1 month",
+        "summary": "Need conversion-focused rebuild + analytics",
+        "projectUrl": "https://startup.com",
         "hoursSinceStageUpdate": 31.6,
+        "hoursUntilBreach": -7.6,
+        "breachAt": "2026-03-19T01:15:00+00:00",
         "overdue": true,
         "recommendedAction": "Send scoped proposal and confirm decision timeline",
         "urgencyScore": 8
