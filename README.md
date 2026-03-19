@@ -192,8 +192,10 @@ Captures freelance leads from Lapslie.com, scores priority, logs them to `data/p
 {
   "success": true,
   "message": "Project brief received",
+  "briefId": "7f1ad2c4e92a31b8",
   "priority": "high",
   "leadScore": 11,
+  "stage": "new",
   "notification": {
     "sent": true
   },
@@ -230,6 +232,7 @@ Returns recent project briefs for lightweight CRM/inbox use.
   "count": 2,
   "briefs": [
     {
+      "briefId": "7f1ad2c4e92a31b8",
       "name": "Jane Founder",
       "email": "jane@startup.com",
       "budget": "£5,000–£10,000",
@@ -237,14 +240,39 @@ Returns recent project briefs for lightweight CRM/inbox use.
       "summary": "Need landing page + analytics sprint",
       "priority": "high",
       "leadScore": 10,
+      "stage": "new",
+      "stageUpdatedAt": "2026-03-19T00:00:00+00:00",
+      "statusNotes": "",
       "submittedAt": "2026-03-19T00:00:00+00:00"
     }
   ]
 }
 ```
 
+### PATCH /api/project-briefs/<briefId>
+Update a lead's pipeline status after outreach/follow-up.
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Request:**
+```json
+{
+  "stage": "proposal_sent",
+  "statusNotes": "Sent scoped 2-week sprint proposal. Follow up Friday."
+}
+```
+
+Allowed `stage` values:
+- `new`
+- `contacted`
+- `qualified`
+- `proposal_sent`
+- `won`
+- `lost`
+
 ### GET /api/project-briefs/summary
-Returns a quick attribution + quality summary so you can see which channels are generating high-priority leads.
+Returns a quick attribution + quality + pipeline summary so you can see which channels are generating high-priority leads and whether they are converting.
 
 **Auth:**
 `Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
@@ -260,7 +288,15 @@ Returns a quick attribution + quality summary so you can see which channels are 
   "summary": {
     "total": 12,
     "byPriority": {"high": 5, "medium": 4, "low": 3},
-    "bySource": {"linkedin": 6, "lapslie.com": 4, "x": 2}
+    "bySource": {"linkedin": 6, "lapslie.com": 4, "x": 2},
+    "byStage": {
+      "new": 4,
+      "contacted": 3,
+      "qualified": 2,
+      "proposal_sent": 2,
+      "won": 1,
+      "lost": 0
+    }
   }
 }
 ```

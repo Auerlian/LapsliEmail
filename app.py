@@ -32,6 +32,7 @@ LEAD_TO_EMAIL = os.environ.get('LEAD_TO_EMAIL', 'james@lapslie.com')
 LEAD_ACK_ENABLED = os.environ.get('LEAD_ACK_ENABLED', 'true').lower() in ('1', 'true', 'yes', 'on')
 LEAD_CALENDLY_URL = os.environ.get('LEAD_CALENDLY_URL', 'https://calendly.com/lapslie/30min')
 LEAD_DASHBOARD_TOKEN = os.environ.get('LEAD_DASHBOARD_TOKEN', '')
+LEAD_STAGES = {'new', 'contacted', 'qualified', 'proposal_sent', 'won', 'lost'}
 
 class HTMLToText(HTMLParser):
     """Simple HTML to text converter for fallback"""
@@ -177,6 +178,37 @@ def append_project_brief_log(payload):
         f.write(json.dumps(payload, ensure_ascii=False) + '\n')
 
 
+def load_all_project_briefs():
+    """Load all stored project briefs from JSONL storage."""
+    if not os.path.exists(PROJECT_BRIEF_LOG_PATH):
+        return []
+
+    briefs = []
+    with open(PROJECT_BRIEF_LOG_PATH, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                briefs.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    return briefs
+
+
+def save_all_project_briefs(briefs):
+    """Rewrite JSONL storage with updated brief records."""
+    os.makedirs(os.path.dirname(PROJECT_BRIEF_LOG_PATH), exist_ok=True)
+    with open(PROJECT_BRIEF_LOG_PATH, 'w', encoding='utf-8') as f:
+        for brief in briefs:
+            f.write(json.dumps(brief, ensure_ascii=False) + '\n')
+
+
+def is_valid_lead_stage(stage):
+    return stage in LEAD_STAGES
+
+
 def send_email_via_lead_smtp(recipient, subject, body):
     """Shared SMTP sender for lead notifications and acknowledgements."""
     if not all([LEAD_SMTP_SERVER, LEAD_SMTP_PORT, LEAD_SMTP_USER, LEAD_SMTP_PASS, LEAD_FROM_EMAIL]):
@@ -287,28 +319,25 @@ James
 
 def load_recent_project_briefs(limit=25):
     """Load most recent project briefs from JSONL log."""
-    if not os.path.exists(PROJECT_BRIEF_LOG_PATH):
-        return []
+    briefs = load_all_project_briefs()
+    recent = list(reversed(briefs[-limit:]))
 
-    briefs = []
-    with open(PROJECT_BRIEF_LOG_PATH, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                briefs.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
+    for brief in recent:
+        if not brief.get('briefId'):
+            identity_seed = f"{brief.get('email', 'unknown')}|{brief.get('submittedAt', '')}|{brief.get('name', '')}"
+            brief['briefId'] = compute_hash(identity_seed)
+        if not brief.get('stage'):
+            brief['stage'] = 'new'
 
-    return list(reversed(briefs[-limit:]))
+    return recent
 
 
 
 def summarize_project_briefs(briefs):
-    """Create lightweight attribution + priority summary from brief list."""
+    """Create lightweight attribution + priority + pipeline summary from brief list."""
     by_priority = {'high': 0, 'medium': 0, 'low': 0}
     by_source = {}
+    by_stage = {stage: 0 for stage in sorted(LEAD_STAGES)}
 
     for brief in briefs:
         priority = brief.get('priority', 'low')
@@ -319,10 +348,16 @@ def summarize_project_briefs(briefs):
         source = brief.get('utmSource') or brief.get('source') or 'unknown'
         by_source[source] = by_source.get(source, 0) + 1
 
+        stage = brief.get('stage', 'new')
+        if stage not in by_stage:
+            by_stage[stage] = 0
+        by_stage[stage] += 1
+
     return {
         'total': len(briefs),
         'byPriority': by_priority,
-        'bySource': by_source
+        'bySource': by_source,
+        'byStage': by_stage
     }
 
 @app.route('/')
@@ -430,6 +465,7 @@ def project_brief():
     if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
         return jsonify({'success': False, 'error': 'Invalid email format'}), 400
 
+    submitted_at = datetime.now(timezone.utc).isoformat()
     payload = {
         'name': str(data.get('name', '')).strip(),
         'email': email,
@@ -444,10 +480,15 @@ def project_brief():
         'utmTerm': str(data.get('utmTerm', '')).strip()[:180],
         'referrer': str(data.get('referrer', '')).strip()[:500],
         'landingPath': str(data.get('landingPath', '')).strip()[:250],
-        'submittedAt': datetime.now(timezone.utc).isoformat(),
+        'submittedAt': submitted_at,
+        'stage': 'new',
+        'stageUpdatedAt': submitted_at,
+        'statusNotes': '',
         'userAgent': request.headers.get('User-Agent', ''),
         'ipHash': compute_hash(request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown'))
     }
+
+    payload['briefId'] = compute_hash(f"{payload['email']}|{payload['submittedAt']}|{payload['name']}")
 
     lead_priority = score_project_brief(payload)
     payload['leadScore'] = lead_priority['score']
@@ -460,8 +501,10 @@ def project_brief():
         return jsonify({
             'success': True,
             'message': 'Project brief received',
+            'briefId': payload['briefId'],
             'priority': payload['priority'],
             'leadScore': payload['leadScore'],
+            'stage': payload['stage'],
             'notification': notify_result,
             'acknowledgement': acknowledgement_result
         })
@@ -489,6 +532,57 @@ def get_project_briefs():
         'success': True,
         'count': len(briefs),
         'briefs': briefs
+    })
+
+
+@app.route('/api/project-briefs/<brief_id>', methods=['PATCH'])
+def update_project_brief(brief_id):
+    """Update lead stage/notes for lightweight pipeline tracking."""
+    if not LEAD_DASHBOARD_TOKEN:
+        return jsonify({'success': False, 'error': 'Dashboard token not configured'}), 403
+
+    auth_header = request.headers.get('Authorization', '')
+    expected_auth = f"Bearer {LEAD_DASHBOARD_TOKEN}"
+    if auth_header != expected_auth:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    data = request.json or {}
+    requested_stage = str(data.get('stage', '')).strip().lower()
+    status_notes = str(data.get('statusNotes', '')).strip()[:800]
+
+    if not requested_stage or not is_valid_lead_stage(requested_stage):
+        return jsonify({
+            'success': False,
+            'error': f"Invalid stage. Allowed values: {', '.join(sorted(LEAD_STAGES))}"
+        }), 400
+
+    briefs = load_all_project_briefs()
+    updated_brief = None
+
+    for brief in briefs:
+        candidate_id = brief.get('briefId')
+        if not candidate_id:
+            identity_seed = f"{brief.get('email', 'unknown')}|{brief.get('submittedAt', '')}|{brief.get('name', '')}"
+            candidate_id = compute_hash(identity_seed)
+            brief['briefId'] = candidate_id
+
+        if candidate_id == brief_id:
+            brief['stage'] = requested_stage
+            brief['stageUpdatedAt'] = datetime.now(timezone.utc).isoformat()
+            if status_notes:
+                brief['statusNotes'] = status_notes
+            updated_brief = brief
+            break
+
+    if not updated_brief:
+        return jsonify({'success': False, 'error': 'Brief not found'}), 404
+
+    save_all_project_briefs(briefs)
+
+    return jsonify({
+        'success': True,
+        'message': 'Project brief updated',
+        'brief': updated_brief
     })
 
 
