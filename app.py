@@ -797,6 +797,55 @@ def build_daily_plan(briefs, sla_hours=24):
     }
 
 
+def build_daily_plan_brief(plan):
+    """Build a plain-text daily execution brief for quick sharing in ops channels."""
+    open_leads = int(plan.get('openLeads', 0) or 0)
+    overdue_leads = int(plan.get('overdueLeads', 0) or 0)
+    sla_hours = int(plan.get('slaHours', 24) or 24)
+    execution_notes = plan.get('executionNotes', []) or []
+    top_actions = plan.get('topActions', []) or []
+    source_recommendations = plan.get('sourceRecommendationDetails', []) or []
+
+    lines = [
+        f"Lead Ops Daily Brief — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"SLA: {sla_hours}h | Open leads: {open_leads} | Overdue: {overdue_leads}",
+        ""
+    ]
+
+    lines.append("Execution notes:")
+    for note in execution_notes[:3]:
+        lines.append(f"- {note}")
+    if not execution_notes:
+        lines.append("- No execution notes available.")
+
+    lines.append("")
+    lines.append("Top actions (do now):")
+    for index, action in enumerate(top_actions[:5], start=1):
+        lines.append(
+            f"{index}. {action.get('name', 'Unknown')} [{action.get('priority', 'low')}/{action.get('stage', 'new')}] "
+            f"{action.get('recommendedAction', 'Follow up with next concrete step')} "
+            f"(source: {action.get('source', 'unknown')}, id: {action.get('briefId', 'n/a')})"
+        )
+    if not top_actions:
+        lines.append("1. No queued top actions — run outbound sends and monitor inbound.")
+
+    lines.append("")
+    lines.append("Source allocation moves:")
+    for rec in source_recommendations[:3]:
+        shift = int(rec.get('allocationShiftPercent', 0) or 0)
+        shift_label = f"+{shift}%" if shift > 0 else f"{shift}%"
+        cap = rec.get('sendCap')
+        cap_text = f", cap {cap} sends" if cap else ""
+        lines.append(
+            f"- {str(rec.get('action', 'review')).upper()} {rec.get('source', 'unknown')} ({shift_label}{cap_text}): "
+            f"{rec.get('executionRule', rec.get('reason', 'Review and decide allocation.'))}"
+        )
+    if not source_recommendations:
+        lines.append("- No source recommendations yet (insufficient data).")
+
+    return '\n'.join(lines)
+
+
 def extract_project_url_signals(project_url, timeout=6):
     """Fetch lightweight public-page signals to personalize first response drafts."""
     if not project_url:
@@ -1319,6 +1368,31 @@ def get_project_briefs_daily_plan():
         'success': True,
         'limit': limit,
         'plan': plan
+    })
+
+
+@app.route('/api/project-briefs/daily-plan-brief', methods=['GET'])
+def get_project_briefs_daily_plan_brief():
+    """Return a plain-text daily brief so operators can paste actions into chat/tools quickly."""
+    auth_error = authorize_dashboard_request()
+    if auth_error:
+        return auth_error
+
+    limit = request.args.get('limit', default=200, type=int)
+    limit = max(1, min(limit, 1000))
+
+    sla_hours = request.args.get('slaHours', default=24, type=int)
+    sla_hours = max(1, min(sla_hours, 168))
+
+    briefs = load_recent_project_briefs(limit=limit)
+    plan = build_daily_plan(briefs, sla_hours=sla_hours)
+    brief_text = build_daily_plan_brief(plan)
+
+    return jsonify({
+        'success': True,
+        'limit': limit,
+        'plan': plan,
+        'brief': brief_text
     })
 
 

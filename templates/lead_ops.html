@@ -33,7 +33,7 @@
       padding: 16px;
       margin-bottom: 16px;
     }
-    .controls { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; }
+    .controls { display: grid; grid-template-columns: 1fr auto auto auto auto; gap: 8px; align-items: center; }
     input, select, textarea, button {
       background: #0d1528;
       color: var(--text);
@@ -75,6 +75,7 @@
       <input id="slaHours" type="number" min="1" max="168" value="24" title="SLA hours" />
       <input id="limit" type="number" min="1" max="100" value="25" title="Queue size" />
       <button id="refreshBtn">Refresh Queue + Plan</button>
+      <button id="copyPlanBtn">Copy Daily Brief</button>
     </div>
 
     <div class="panel">
@@ -203,6 +204,42 @@
 
       renderDailyPlan(data.plan || {});
       planStatus.textContent = 'Loaded';
+      planStatus.className = 'ok';
+    }
+
+    async function copyDailyBrief() {
+      const slaHours = Number(document.getElementById('slaHours').value || 24);
+      const limit = Number(document.getElementById('limit').value || 25);
+
+      const res = await fetch(`/api/project-briefs/daily-plan-brief?slaHours=${slaHours}&limit=${Math.max(limit, 200)}`, {
+        headers: authHeaders()
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to build daily brief');
+      }
+
+      const brief = String(data.brief || '').trim();
+      if (!brief) {
+        throw new Error('Daily brief is empty');
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(brief);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = brief;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+
+      planStatus.textContent = 'Daily brief copied to clipboard';
       planStatus.className = 'ok';
     }
 
@@ -365,6 +402,15 @@
       } catch (err) {
         statusText.textContent = err.message;
         statusText.className = 'bad';
+        planStatus.textContent = err.message;
+        planStatus.className = 'bad';
+      }
+    });
+
+    document.getElementById('copyPlanBtn').addEventListener('click', async () => {
+      try {
+        await copyDailyBrief();
+      } catch (err) {
         planStatus.textContent = err.message;
         planStatus.className = 'bad';
       }

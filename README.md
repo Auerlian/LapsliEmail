@@ -149,6 +149,7 @@ Open `/lead-ops` in the browser for a lightweight daily operator console that co
 What it supports:
 - Pulls `GET /api/project-briefs/follow-up-queue` with configurable SLA window.
 - Pulls `GET /api/project-briefs/daily-plan` to show open/overdue counts, top actions, and source allocation guidance.
+- Generates a share-ready execution summary via `GET /api/project-briefs/daily-plan-brief` (and supports one-click clipboard copy in the UI).
 - One-click first-response execution via `POST /api/project-briefs/<briefId>/first-response-send`.
 - One-click proposal send + stage move via `POST /api/project-briefs/<briefId>/proposal-send`.
 - One-click stage-aware follow-up via `POST /api/project-briefs/<briefId>/follow-up-send`.
@@ -479,6 +480,30 @@ Allocation guidance is sample-aware:
       "Clear overdue queue first: 3 leads beyond 24h SLA."
     ]
   }
+}
+```
+
+### GET /api/project-briefs/daily-plan-brief
+Returns the same daily plan data plus a plain-text execution brief (for easy paste into Slack/WhatsApp/task notes).
+
+**Auth:**
+`Authorization: Bearer <LEAD_DASHBOARD_TOKEN>`
+
+**Query params:**
+- `limit` (1-1000, default 200)
+- `slaHours` (1-168, default 24)
+
+**Response:**
+```json
+{
+  "success": true,
+  "limit": 200,
+  "plan": {
+    "slaHours": 24,
+    "openLeads": 8,
+    "overdueLeads": 3
+  },
+  "brief": "Lead Ops Daily Brief — 2026-03-19 08:00 UTC\nSLA: 24h | Open leads: 8 | Overdue: 3\n..."
 }
 ```
 
