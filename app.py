@@ -14,6 +14,7 @@ import io
 import json
 from datetime import datetime, timezone
 from html.parser import HTMLParser
+from urllib.request import Request, urlopen
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
@@ -32,6 +33,8 @@ LEAD_TO_EMAIL = os.environ.get('LEAD_TO_EMAIL', 'james@lapslie.com')
 LEAD_ACK_ENABLED = os.environ.get('LEAD_ACK_ENABLED', 'true').lower() in ('1', 'true', 'yes', 'on')
 LEAD_CALENDLY_URL = os.environ.get('LEAD_CALENDLY_URL', 'https://calendly.com/lapslie/30min')
 LEAD_DASHBOARD_TOKEN = os.environ.get('LEAD_DASHBOARD_TOKEN', '')
+LEAD_ALERT_WEBHOOK_URL = os.environ.get('LEAD_ALERT_WEBHOOK_URL', '').strip()
+LEAD_ALERT_MIN_PRIORITY = os.environ.get('LEAD_ALERT_MIN_PRIORITY', 'high').strip().lower()
 LEAD_STAGES = {'new', 'contacted', 'qualified', 'proposal_sent', 'won', 'lost'}
 FOLLOW_UP_STAGES = {'new', 'contacted', 'qualified', 'proposal_sent'}
 
@@ -227,6 +230,55 @@ def send_email_via_lead_smtp(recipient, subject, body):
         server.sendmail(LEAD_FROM_EMAIL, recipient, msg.as_string())
 
     return {'sent': True}
+
+
+def should_send_lead_alert(priority):
+    thresholds = {'low': 1, 'medium': 2, 'high': 3}
+    candidate = thresholds.get((priority or 'low').lower(), 1)
+    minimum = thresholds.get((LEAD_ALERT_MIN_PRIORITY or 'high').lower(), 3)
+    return candidate >= minimum
+
+
+def send_lead_alert(event_type, payload):
+    """Push lead alerts to webhook destinations for fast speed-to-lead response."""
+    if not LEAD_ALERT_WEBHOOK_URL:
+        return {'sent': False, 'reason': 'lead_alert_webhook_not_configured'}
+
+    if event_type == 'lead.created' and not should_send_lead_alert(payload.get('priority')):
+        return {'sent': False, 'reason': 'priority_below_alert_threshold'}
+
+    source = payload.get('utmSource') or payload.get('source') or 'unknown'
+    summary = str(payload.get('summary', '')).strip()
+    compact_summary = summary[:220] + ('…' if len(summary) > 220 else '')
+
+    message = {
+        'eventType': event_type,
+        'briefId': payload.get('briefId'),
+        'name': payload.get('name'),
+        'email': payload.get('email'),
+        'priority': payload.get('priority'),
+        'stage': payload.get('stage'),
+        'source': source,
+        'budget': payload.get('budget'),
+        'timeline': payload.get('timeline'),
+        'leadScore': payload.get('leadScore'),
+        'stageUpdatedAt': payload.get('stageUpdatedAt') or payload.get('submittedAt'),
+        'submittedAt': payload.get('submittedAt'),
+        'summary': compact_summary
+    }
+
+    try:
+        req = Request(
+            LEAD_ALERT_WEBHOOK_URL,
+            data=json.dumps(message).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urlopen(req, timeout=8) as response:
+            status = getattr(response, 'status', None) or response.getcode()
+        return {'sent': True, 'status': status}
+    except Exception as exc:
+        return {'sent': False, 'reason': str(exc)}
 
 
 def score_project_brief(payload):
@@ -709,6 +761,7 @@ def project_brief():
         append_project_brief_log(payload)
         notify_result = notify_project_brief_via_email(payload)
         acknowledgement_result = send_project_brief_acknowledgement(payload)
+        alert_result = send_lead_alert('lead.created', payload)
         return jsonify({
             'success': True,
             'message': 'Project brief received',
@@ -717,7 +770,8 @@ def project_brief():
             'leadScore': payload['leadScore'],
             'stage': payload['stage'],
             'notification': notify_result,
-            'acknowledgement': acknowledgement_result
+            'acknowledgement': acknowledgement_result,
+            'alert': alert_result
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -770,6 +824,7 @@ def update_project_brief(brief_id):
             brief['briefId'] = candidate_id
 
         if candidate_id == brief_id:
+            previous_stage = brief.get('stage', 'new')
             brief['stage'] = requested_stage
             now_iso = datetime.now(timezone.utc).isoformat()
             brief['stageUpdatedAt'] = now_iso
@@ -792,10 +847,15 @@ def update_project_brief(brief_id):
 
     save_all_project_briefs(briefs)
 
+    alert_result = {'sent': False, 'reason': 'stage_unchanged'}
+    if previous_stage != requested_stage and requested_stage in {'proposal_sent', 'won', 'lost'}:
+        alert_result = send_lead_alert('lead.stage_updated', updated_brief)
+
     return jsonify({
         'success': True,
         'message': 'Project brief updated',
-        'brief': updated_brief
+        'brief': updated_brief,
+        'alert': alert_result
     })
 
 

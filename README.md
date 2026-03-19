@@ -201,6 +201,10 @@ Captures freelance leads from Lapslie.com, scores priority, logs them to `data/p
   },
   "acknowledgement": {
     "sent": true
+  },
+  "alert": {
+    "sent": true,
+    "status": 200
   }
 }
 ```
@@ -215,6 +219,11 @@ Optional lead-system env vars:
 - `LEAD_ACK_ENABLED` (default `true`)
 - `LEAD_CALENDLY_URL` (default `https://calendly.com/lapslie/30min`)
 - `LEAD_DASHBOARD_TOKEN` (required for secure lead inbox + summary endpoints)
+- `LEAD_ALERT_WEBHOOK_URL` (optional webhook for instant lead/stage alerts)
+- `LEAD_ALERT_MIN_PRIORITY` (`low|medium|high`, default `high`)
+
+When `LEAD_ALERT_WEBHOOK_URL` is set, new leads above the configured threshold trigger a webhook POST with:
+`eventType`, `briefId`, `name`, `email`, `priority`, `stage`, `source`, `budget`, `timeline`, `leadScore`, timestamps, and a summary preview.
 
 ### GET /api/project-briefs
 Returns recent project briefs for lightweight CRM/inbox use.
@@ -274,6 +283,8 @@ Allowed `stage` values:
 When a lead is first moved into any follow-up stage (`contacted`, `qualified`, `proposal_sent`, `won`, `lost`), the API also stores:
 - `contactedAt`
 - `firstResponseHours` (hours between `submittedAt` and first contact)
+
+If `LEAD_ALERT_WEBHOOK_URL` is set, stage changes into `proposal_sent`, `won`, or `lost` also emit a webhook event (`eventType: lead.stage_updated`) so pipeline movement is visible immediately.
 
 ### GET /api/project-briefs/summary
 Returns a quick attribution + quality + pipeline summary so you can see which channels are generating high-priority leads and whether they are converting.
