@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
+
+TRACKED_LINK_TOKENS = ("{brief_link}", "{call_link}", "[brief_link]", "[call_link]", "{{brief_link}}", "{{call_link}}")
 from urllib.parse import urlencode
 
 # Ensure project root is importable when running from workflows/
@@ -226,6 +228,17 @@ def build_tracked_url(base_url: str, params: Dict[str, str]) -> str:
     return f"{base_url}{sep}{urlencode(clean_params)}"
 
 
+def sequence_uses_tracked_link_tokens(steps: List[SequenceStep]) -> bool:
+    for step in steps:
+        surfaces = [step.subject, step.text_body]
+        if step.html_body:
+            surfaces.append(step.html_body)
+        combined = "\n".join(surfaces)
+        if any(token in combined for token in TRACKED_LINK_TOKENS):
+            return True
+    return False
+
+
 def run(args: argparse.Namespace) -> int:
     leads = load_csv_leads(Path(args.leads_csv))
     steps = load_sequence(Path(args.sequence_json))
@@ -239,6 +252,25 @@ def run(args: argparse.Namespace) -> int:
         return 0
 
     smtp_config = None
+    sequence_has_tracked_cta_tokens = sequence_uses_tracked_link_tokens(steps)
+
+    if args.send and not args.enable_tracked_links and not args.allow_untracked_send:
+        raise ValueError(
+            "Send mode requires tracked links by default. Re-run with --enable-tracked-links, "
+            "or explicitly bypass with --allow-untracked-send."
+        )
+
+    if (
+        args.send
+        and args.enable_tracked_links
+        and not sequence_has_tracked_cta_tokens
+        and not args.allow_untracked_send
+    ):
+        raise ValueError(
+            "Tracked links are enabled but no {brief_link}/{call_link} tokens were found in sequence templates. "
+            "Add tracked CTA tokens or bypass intentionally with --allow-untracked-send."
+        )
+
     if args.send:
         smtp_config = build_smtp_config(args)
 
@@ -382,6 +414,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--enable-tracked-links",
         action="store_true",
         help="Generate per-lead tracked {brief_link}/{call_link} tokens with UTM params",
+    )
+    parser.add_argument(
+        "--allow-untracked-send",
+        action="store_true",
+        help="Bypass tracked-link enforcement in send mode (not recommended)",
     )
     parser.add_argument("--base-brief-url", default="https://lapslie.com/#projectBriefForm", help="Base brief CTA URL")
     parser.add_argument("--base-call-url", default="https://calendly.com/lapslie/30min", help="Base call CTA URL")

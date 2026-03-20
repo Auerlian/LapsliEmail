@@ -63,7 +63,10 @@ python3 workflows/run_recovery_block.py \
 
 (Use `--send` to execute; default mode is dry-run.)
 
-Send mode uses SMTP with rate limiting + retry backoff:
+Send mode uses SMTP with rate limiting + retry backoff.
+
+Safety default: send mode is tracked-link enforced (you should pass `--enable-tracked-links` and include `{brief_link}`/`{call_link}` tokens in templates).
+
 
 ```bash
 export SMTP_HOST="smtp-relay.brevo.com"

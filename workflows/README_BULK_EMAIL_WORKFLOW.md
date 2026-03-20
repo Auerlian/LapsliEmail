@@ -42,7 +42,10 @@ This prints previews and writes reports into `out/`.
 
 ## 4) Send for real
 
-Set SMTP environment variables and send mode:
+Set SMTP environment variables and send mode.
+
+> Safety default: send mode is **tracked-link enforced**. If you forget `--enable-tracked-links` (or omit `{brief_link}` / `{call_link}` in templates), the run fails closed.
+
 
 ```bash
 cd LapsliEmail
@@ -132,5 +135,6 @@ Main options:
 - `--smtp-host/--smtp-port/--smtp-user/--smtp-pass` (or env vars)
 - `--from-email` (or `FROM_EMAIL` env var)
 - `--enable-tracked-links` (build per-lead `{brief_link}` and `{call_link}`)
+- `--allow-untracked-send` (escape hatch; bypasses tracked-link enforcement)
 - `--utm-source/--utm-medium/--utm-campaign/--utm-content-prefix`
 - `--base-brief-url/--base-call-url`
