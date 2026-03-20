@@ -59,7 +59,9 @@ python3 workflows/bulk_email_sequence.py \
   --send \
   --rate-per-minute 20 \
   --retries 3 \
-  --backoff-seconds 2
+  --backoff-seconds 2 \
+  --enable-tracked-links \
+  --utm-campaign "mar-2026-founders"
 ```
 
 ## Configuration

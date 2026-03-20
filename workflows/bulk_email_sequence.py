@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
+from urllib.parse import urlencode
 
 # Ensure project root is importable when running from workflows/
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -217,6 +218,14 @@ def send_with_backoff(
         time.sleep(sleep_for)
 
 
+def build_tracked_url(base_url: str, params: Dict[str, str]) -> str:
+    clean_params = {k: v for k, v in params.items() if v}
+    if not clean_params:
+        return base_url
+    sep = "&" if "?" in base_url else "?"
+    return f"{base_url}{sep}{urlencode(clean_params)}"
+
+
 def run(args: argparse.Namespace) -> int:
     leads = load_csv_leads(Path(args.leads_csv))
     steps = load_sequence(Path(args.sequence_json))
@@ -245,6 +254,41 @@ def run(args: argparse.Namespace) -> int:
     for lead in leads:
         tokens = dict(lead)
         tokens.setdefault("name", tokens.get("first_name") or "there")
+
+        if args.enable_tracked_links:
+            slug = (
+                tokens.get("company")
+                or tokens.get("name")
+                or tokens.get("email", "lead").split("@")[0]
+            )
+            safe_slug = "-".join("".join(ch.lower() if ch.isalnum() else " " for ch in slug).split()) or "lead"
+            campaign = args.utm_campaign or datetime.now().strftime("%Y-%m-outbound")
+
+            source = tokens.get("utm_source") or args.utm_source
+            medium = tokens.get("utm_medium") or args.utm_medium
+            content = tokens.get("utm_content") or f"{args.utm_content_prefix}-{safe_slug}"
+            term = tokens.get("utm_term") or (tokens.get("role") or "")
+
+            brief_params = {
+                "utm_source": source,
+                "utm_medium": medium,
+                "utm_campaign": campaign,
+                "utm_content": content,
+                "utm_term": term,
+            }
+            call_params = dict(brief_params)
+            call_params["utm_content"] = tokens.get("utm_content_call") or f"{args.utm_content_prefix}-call-{safe_slug}"
+
+            tokens["brief_link"] = build_tracked_url(args.base_brief_url, brief_params)
+            tokens["call_link"] = build_tracked_url(args.base_call_url, call_params)
+            tokens.setdefault("utm_source", source)
+            tokens.setdefault("utm_medium", medium)
+            tokens.setdefault("utm_campaign", campaign)
+            tokens.setdefault("utm_content", content)
+            tokens.setdefault("utm_term", term)
+        else:
+            tokens.setdefault("brief_link", args.base_brief_url)
+            tokens.setdefault("call_link", args.base_call_url)
 
         for step in steps:
             rendered_subject = render_with_tokens(step.subject, tokens)
@@ -333,6 +377,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--smtp-pass", help="SMTP password (or env SMTP_PASS)")
 
     parser.add_argument("--output-dir", default="out", help="Output directory for run results (default: out)")
+
+    parser.add_argument(
+        "--enable-tracked-links",
+        action="store_true",
+        help="Generate per-lead tracked {brief_link}/{call_link} tokens with UTM params",
+    )
+    parser.add_argument("--base-brief-url", default="https://lapslie.com/#projectBriefForm", help="Base brief CTA URL")
+    parser.add_argument("--base-call-url", default="https://calendly.com/lapslie/30min", help="Base call CTA URL")
+    parser.add_argument("--utm-source", default="email", help="Default UTM source for tracked links")
+    parser.add_argument("--utm-medium", default="outbound", help="Default UTM medium for tracked links")
+    parser.add_argument("--utm-campaign", help="Default UTM campaign (defaults to YYYY-MM-outbound)")
+    parser.add_argument(
+        "--utm-content-prefix",
+        default="seq",
+        help="Prefix for generated utm_content values (default: seq)",
+    )
     return parser
 
 

@@ -1,4 +1,4 @@
-email,name,company,role,city
-alice@acme.com,Alice,Acme,Founder,London
-ben@northstar.io,Ben,Northstar,Head of Growth,Manchester
-chloe@greenpixel.co,Chloe,Green Pixel,Marketing Lead,Bristol
+email,name,company,role,city,utm_source,utm_medium
+alice@acme.com,Alice,Acme,Founder,London,email,outbound
+ben@northstar.io,Ben,Northstar,Head of Growth,Manchester,linkedin,dm
+chloe@greenpixel.co,Chloe,Green Pixel,Marketing Lead,Bristol,referral,intro

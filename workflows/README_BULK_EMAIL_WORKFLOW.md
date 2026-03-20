@@ -28,6 +28,7 @@ Supported personalization tokens:
 - `{company}`
 - `{role}`
 - `{city}`
+- `{brief_link}` and `{call_link}` (tracked links when `--enable-tracked-links` is used)
 - `[name]` and `{{name}}` are also supported
 
 ## 3) Dry-run first (safe preview)
@@ -57,7 +58,9 @@ python3 workflows/bulk_email_sequence.py \
   --send \
   --rate-per-minute 20 \
   --retries 3 \
-  --backoff-seconds 2
+  --backoff-seconds 2 \
+  --enable-tracked-links \
+  --utm-campaign "mar-2026-founders"
 ```
 
 ## What this workflow includes
@@ -85,3 +88,6 @@ Main options:
 - `--backoff-seconds 2`
 - `--smtp-host/--smtp-port/--smtp-user/--smtp-pass` (or env vars)
 - `--from-email` (or `FROM_EMAIL` env var)
+- `--enable-tracked-links` (build per-lead `{brief_link}` and `{call_link}`)
+- `--utm-source/--utm-medium/--utm-campaign/--utm-content-prefix`
+- `--base-brief-url/--base-call-url`

@@ -2,7 +2,11 @@ Hi {name},
 
 I noticed what {company} is doing and had one idea that could help your {role} goals this quarter.
 
-If you want, I can send a quick 3-point audit tailored to your current funnel.
+If useful, you can send a 2-minute brief here and I’ll reply with 3 concrete fixes:
+{brief_link}
+
+Or if you prefer to talk first:
+{call_link}
 
 Best,
 James

@@ -2,7 +2,8 @@ Hi {name},
 
 Just bubbling this up in case it got buried.
 
-Happy to send over the 3-point audit for {company} if useful.
+If it helps, here’s the same 2-minute brief link:
+{brief_link}
 
 Best,
 James
