@@ -63,6 +63,25 @@ python3 workflows/bulk_email_sequence.py \
   --utm-campaign "mar-2026-founders"
 ```
 
+## Post-Deploy Lead Funnel Smoke Test (recommended)
+
+Before sending new outbound batches, run a quick end-to-end smoke test:
+
+```bash
+cd LapsliEmail
+python3 workflows/smoke_test_lead_funnel.py \
+  --dashboard-token "$LEAD_DASHBOARD_TOKEN" \
+  --base-url "https://lapsliemail-api.onrender.com"
+```
+
+What it validates:
+- brief creation (`POST /api/project-brief`)
+- inbox visibility (`GET /api/project-briefs`)
+- first-response draft generation (`GET /api/project-briefs/<briefId>/first-response-draft`)
+- attribution capture in summary (`GET /api/project-briefs/summary`)
+
+Tip: run this after each deploy and before high-volume campaigns.
+
 ## What this workflow includes
 
 - CSV lead import + dedupe by email

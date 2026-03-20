@@ -44,6 +44,14 @@ cd LapsliEmail
 ./workflows/run_bulk_sequence_starter.sh
 ```
 
+Post-deploy reliability check (recommended before a campaign block):
+
+```bash
+python3 workflows/smoke_test_lead_funnel.py \
+  --dashboard-token "$LEAD_DASHBOARD_TOKEN" \
+  --base-url "https://lapsliemail-api.onrender.com"
+```
+
 Send mode uses SMTP with rate limiting + retry backoff:
 
 ```bash
