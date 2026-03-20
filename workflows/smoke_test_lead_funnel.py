@@ -132,7 +132,8 @@ def main() -> int:
         timeout=args.timeout_seconds,
     )
 
-    by_source = summary.get("bySource", {}) if isinstance(summary, dict) else {}
+    summary_block = summary.get("summary", {}) if isinstance(summary, dict) else {}
+    by_source = summary_block.get("bySource", {}) if isinstance(summary_block, dict) else {}
     source_value = by_source.get(args.source, 0)
     if not source_value:
         raise RuntimeError(f"Summary missing source '{args.source}': {summary}")

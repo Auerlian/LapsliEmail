@@ -82,6 +82,30 @@ What it validates:
 
 Tip: run this after each deploy and before high-volume campaigns.
 
+## Daily stalled-lead recovery block (recommended)
+
+Use this to recover warm opportunities that are stuck in `contacted`, `qualified`, or `proposal_sent` for too long.
+
+```bash
+cd LapsliEmail
+python3 workflows/run_recovery_block.py \
+  --dashboard-token "$LEAD_DASHBOARD_TOKEN" \
+  --base-url "https://lapsliemail-api.onrender.com" \
+  --stale-hours 48
+```
+
+Default mode is **dry-run**. It prints exactly which leads would be actioned.
+
+Execute for real:
+
+```bash
+python3 workflows/run_recovery_block.py \
+  --dashboard-token "$LEAD_DASHBOARD_TOKEN" \
+  --send
+```
+
+By default, qualified leads get `proposal-send`; contacted/proposal_sent leads get `follow-up-send`.
+
 ## What this workflow includes
 
 - CSV lead import + dedupe by email

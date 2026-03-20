@@ -52,6 +52,17 @@ python3 workflows/smoke_test_lead_funnel.py \
   --base-url "https://lapsliemail-api.onrender.com"
 ```
 
+Daily stalled-lead recovery block (recommended after queue review):
+
+```bash
+python3 workflows/run_recovery_block.py \
+  --dashboard-token "$LEAD_DASHBOARD_TOKEN" \
+  --base-url "https://lapsliemail-api.onrender.com" \
+  --stale-hours 48
+```
+
+(Use `--send` to execute; default mode is dry-run.)
+
 Send mode uses SMTP with rate limiting + retry backoff:
 
 ```bash
